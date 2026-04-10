@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Plus, Rocket, TableProperties, Wallet } from "lucide-react";
+import { LoaderCircle, Plus, TableProperties, Wallet } from "lucide-react";
 
 import { ARKIV_CHAIN } from "@/lib/arkiv/chain";
 import { Button } from "@/components/ui/button";
@@ -12,21 +12,15 @@ const shortAddress = (address?: string) =>
 
 export function ArkivToolbar() {
   const addDraftEntity = useSchemaStore((state) => state.addDraftEntity);
-  const activeNodeId = useSchemaStore((state) => state.activeNodeId);
-  const nodes = useSchemaStore((state) => state.nodes);
   const connectWallet = useArkivStore((state) => state.connectWallet);
   const retryNetworkSwitch = useArkivStore((state) => state.retryNetworkSwitch);
-  const deployActiveDraft = useArkivStore((state) => state.deployActiveDraft);
   const connecting = useArkivStore((state) => state.connecting);
-  const deploying = useArkivStore((state) => state.deploying);
   const account = useArkivStore((state) => state.account);
   const chainId = useArkivStore((state) => state.chainId);
   const networkNudge = useArkivStore((state) => state.networkNudge);
   const error = useArkivStore((state) => state.error);
   const walletAvailable = useArkivStore((state) => state.walletAvailable);
 
-  const activeNode = nodes.find((node) => node.id === activeNodeId) ?? nodes[0];
-  const activeNodeIsDraft = activeNode?.data.mode === "draft";
   const onArkivNetwork = chainId === ARKIV_CHAIN.id;
 
   return (
@@ -70,20 +64,6 @@ export function ArkivToolbar() {
           >
             <Plus className="size-4" />
             New Draft
-          </Button>
-
-          <Button
-            onClick={deployActiveDraft}
-            className="h-11 rounded-[18px] px-4"
-            size="lg"
-            disabled={!walletAvailable || !account || !onArkivNetwork || !activeNodeIsDraft || deploying}
-          >
-            {deploying ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <Rocket className="size-4" />
-            )}
-            Deploy to Kaolin
           </Button>
         </div>
       </div>

@@ -43,6 +43,7 @@ type ArkivState = {
   refreshOwnedEntities: () => Promise<void>;
   loadEntityIntoCanvas: (entityKey: Hex) => Promise<void>;
   deployActiveDraft: () => Promise<void>;
+  deployDraft: (nodeId: string) => Promise<void>;
   updateActiveEntity: () => Promise<void>;
 };
 
@@ -264,6 +265,48 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       set({
         error:
           error instanceof Error ? error.message : "Arkiv deployment failed in MetaMask.",
+      });
+    } finally {
+      set({ deploying: false });
+    }
+  },
+  deployDraft: async (nodeId: string) => {
+    const { account } = get();
+    const schemaStore = useSchemaStore.getState();
+    const node = schemaStore.nodes.find((n) => n.id === nodeId);
+
+    if (!account) {
+      set({
+        error: 'Connect MetaMask to Arkiv Kaolin before deploying.',
+      });
+      return;
+    }
+
+    if (!node || node.data.mode !== 'draft') {
+      set({
+        error: 'The selected entity is not a draft.',
+      });
+      return;
+    }
+
+    set({ deploying: true, error: undefined });
+
+    try {
+      const { snapshot } = await deployEntityFromDraft({
+        account,
+        label: node.data.label,
+        fields: node.data.fields,
+        expirationDuration: node.data.expirationDuration,
+        dataFields: node.data.dataFields,
+      });
+
+      schemaStore.replaceNodeWithPersisted(node.id, snapshot);
+      await get().refreshBlockTiming();
+      await get().refreshOwnedEntities();
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Arkiv deployment failed in MetaMask.',
       });
     } finally {
       set({ deploying: false });

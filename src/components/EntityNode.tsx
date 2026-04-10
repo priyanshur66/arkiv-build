@@ -1,7 +1,7 @@
 'use client'
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CheckCircle, Database, ExternalLink, Loader2, Minus, Plus, RefreshCw, X } from 'lucide-react'
+import { CheckCircle, Database, ExternalLink, Loader2, Minus, Plus, RefreshCw, Rocket, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -118,6 +118,12 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
   const blockTiming = useArkivStore((s) => s.blockTiming)
   const updating = useArkivStore((s) => s.updating)
   const updateActiveEntity = useArkivStore((s) => s.updateActiveEntity)
+  const deployDraft = useArkivStore((s) => s.deployDraft)
+  const deploying = useArkivStore((s) => s.deploying)
+  const walletAvailable = useArkivStore((s) => s.walletAvailable)
+  const account = useArkivStore((s) => s.account)
+  const chainId = useArkivStore((s) => s.chainId)
+  const { ARKIV_CHAIN, isArkivKaolinChain } = require('@/lib/arkiv/chain')
 
   const [updateSuccess, setUpdateSuccess] = useState(false)
 
@@ -420,8 +426,25 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
 
           {/* ---- Actions ---- */}
           {isDraft ? (
-            // Draft: only the old "New Field" button was previously here — now replaced by inline Add Field
-            null
+            /* Draft: Deploy to Kaolin button */
+            <Button
+              size="sm"
+              onClick={() => deployDraft(id)}
+              disabled={!walletAvailable || !account || !isArkivKaolinChain(chainId) || deploying}
+              className="nodrag nopan h-11 w-full rounded-[22px] border border-transparent bg-slate-950 text-white shadow-[0_18px_40px_-22px_rgba(15,23,42,0.7)] transition duration-200 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-slate-200"
+            >
+              {deploying ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Deploying…
+                </>
+              ) : (
+                <>
+                  <Rocket className="mr-2 size-4" />
+                  Deploy to Kaolin
+                </>
+              )}
+            </Button>
           ) : (
             /* Persisted: Update Entity button */
             <Button
