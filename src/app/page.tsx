@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Trash2 } from "lucide-react";
 import {
   Background,
@@ -21,11 +21,8 @@ import { EntityNode } from "@/components/EntityNode";
 import { useArkivStore } from "@/store/useArkivStore";
 import { useSchemaStore } from "@/store/useSchemaStore";
 
-const nodeTypes = {
-  entity: EntityNode,
-};
-
 function SchemaCanvas() {
+  const nodeTypes = useMemo(() => ({ entity: EntityNode }), []);
   const nodes = useSchemaStore((state) => state.nodes);
   const edges = useSchemaStore((state) => state.edges);
   const onNodesChange = useSchemaStore((state) => state.onNodesChange);

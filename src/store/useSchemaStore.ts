@@ -196,7 +196,7 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
   onConnect: (connection) =>
     set((state) => {
       const edgeId = `xy-edge__${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`;
-      const newEdge = {
+      const newEdge: SchemaEdge = {
         ...connection,
         id: edgeId,
         animated: true,
