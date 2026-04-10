@@ -33,9 +33,9 @@ export function TopNav() {
 
   return (
     <div className="absolute top-6 left-6 right-6 z-50">
-      <nav className="flex items-center justify-between rounded-[20px] border border-gray-200 bg-white px-6 py-4 shadow-md">
+      <nav className="flex items-center justify-between rounded-[20px] border border-white/40 bg-white/80 backdrop-blur-xl px-6 py-4 shadow-xl shadow-gray-200/50 transition-all duration-300 hover:shadow-2xl hover:shadow-gray-200/60">
         {/* Logo */}
-        <Link href="/" className="font-mono text-xl font-bold tracking-widest text-[#111]">
+        <Link href="/" className="font-mono text-xl font-bold tracking-widest text-[#111] hover:opacity-70 transition-opacity">
           [ ARKIV BUILD ]
         </Link>
 
@@ -46,11 +46,11 @@ export function TopNav() {
               href="https://kaolin.hoodi.arkiv.network/faucet/" 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="flex items-center h-8 rounded-lg bg-orange-500 text-white px-3 shadow-sm hover:bg-orange-600 transition-colors"
+              className="flex items-center h-8 rounded-lg bg-orange-500 text-white px-4 shadow-md shadow-orange-500/20 hover:bg-orange-600 hover:scale-105 hover:shadow-orange-500/40 active:scale-95 transition-all duration-300"
             >
               Faucet
             </Link>
-            <Link href="https://arkiv.network/dev" target="_blank" rel="noopener noreferrer" className="hover:text-black transition-colors">
+            <Link href="https://arkiv.network/dev" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:-translate-y-0.5 transition-all duration-300">
               Docs
             </Link>
           </div>
@@ -84,7 +84,7 @@ export function TopNav() {
           <div className="flex items-center gap-2">
             <Button
               onClick={account ? disconnectWallet : connectWallet}
-              className="h-10 rounded-xl bg-[#1f1f1f] hover:bg-black font-semibold text-white px-4 transition-colors"
+              className="h-10 rounded-xl bg-[#1f1f1f] hover:bg-black font-semibold text-white px-5 shadow-lg shadow-black/10 hover:shadow-xl hover:shadow-black/20 hover:scale-105 active:scale-95 transition-all duration-300"
               disabled={connecting}
             >
               {connecting ? (

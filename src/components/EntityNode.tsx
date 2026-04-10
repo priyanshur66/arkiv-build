@@ -124,6 +124,7 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
   const updateActiveEntity = useArkivStore((s) => s.updateActiveEntity)
   const deployDraft = useArkivStore((s) => s.deployDraft)
   const deploying = useArkivStore((s) => s.deploying)
+  const deployingNodeId = useArkivStore((s) => s.deployingNodeId)
   const walletAvailable = useArkivStore((s) => s.walletAvailable)
   const account = useArkivStore((s) => s.account)
   const chainId = useArkivStore((s) => s.chainId)
@@ -170,10 +171,10 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
 
       <div
         className={[
-          'overflow-hidden rounded-[24px] bg-white transition-all',
+          'overflow-hidden rounded-[24px] bg-white/90 backdrop-blur-xl transition-all duration-400 ease-out',
           selected
-            ? 'border-[2px] border-[#ff7a45] shadow-lg ring-[6px] ring-[#ff7a45]/10'
-            : 'border-[2px] border-[#ff7a45] shadow-md',
+            ? 'border-[2px] border-[#ff7a45] shadow-2xl shadow-orange-500/20 ring-[8px] ring-[#ff7a45]/15 scale-[1.02]'
+            : 'border-[2px] border-transparent ring-1 ring-gray-200 shadow-xl hover:shadow-2xl hover:shadow-gray-300/50 hover:-translate-y-1',
         ].join(' ')}
       >
         {/* ------------------------------------------------------------------ Header */}
@@ -319,9 +320,9 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
               size="sm"
               onClick={() => addField(id)}
               variant="outline"
-              className="nodrag nopan h-12 w-full rounded-[14px] border border-dashed border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-white hover:text-gray-900 shadow-none font-mono tracking-widest uppercase text-[12px] bg-transparent"
+              className="nodrag nopan h-12 w-full rounded-[14px] border border-dashed border-gray-300 text-gray-500 transition-all duration-300 hover:border-orange-400 hover:bg-orange-50/50 hover:text-orange-600 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] shadow-none font-mono tracking-widest uppercase text-[12px] bg-transparent"
             >
-              <Plus className="mr-2 size-3.5" />
+              <Plus className="mr-2 size-3.5 transition-transform group-hover:rotate-90" />
               Add Attribute
             </Button>
           </div>
@@ -375,9 +376,9 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                 size="sm"
                 onClick={() => addDataField(id)}
                 variant="outline"
-                className="nodrag nopan h-12 w-full rounded-[14px] border border-dashed border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-white hover:text-gray-900 shadow-none font-mono tracking-widest uppercase text-[12px] bg-transparent"
+                className="nodrag nopan h-12 w-full rounded-[14px] border border-dashed border-gray-300 text-gray-500 transition-all duration-300 hover:border-orange-400 hover:bg-orange-50/50 hover:text-orange-600 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] shadow-none font-mono tracking-widest uppercase text-[12px] bg-transparent"
               >
-                <Plus className="mr-2 size-3.5" />
+                <Plus className="mr-2 size-3.5 transition-transform group-hover:rotate-90" />
                 Add Data Field
               </Button>
             </div>
@@ -444,9 +445,9 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                   size="sm"
                   onClick={() => deployDraft(id)}
                   disabled={!walletAvailable || !account || !isArkivKaolinChain(chainId) || deploying || hasPendingParent}
-                  className="nodrag nopan h-14 w-full rounded-[14px] bg-[#1a1a1a] text-white font-mono tracking-widest uppercase text-xs hover:bg-[#333] transition-colors"
+                  className="nodrag nopan h-14 w-full rounded-[14px] bg-[#1a1a1a] shadow-lg shadow-black/10 text-white font-mono tracking-widest uppercase text-xs transition-all duration-300 hover:bg-[#333] hover:shadow-xl hover:shadow-black/20 hover:-translate-y-1 active:scale-[0.98] disabled:hover:translate-y-0 disabled:hover:scale-100"
                 >
-                  {deploying ? (
+                  {deploying && deployingNodeId === id ? (
                     <>
                       <Loader2 className="mr-3 size-4 animate-spin" />
                       Deploying…
@@ -476,10 +477,10 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                   onClick={handleUpdate}
                   disabled={updating}
                   className={[
-                    'nodrag nopan h-14 w-full rounded-[14px] text-white font-mono tracking-widest uppercase text-xs transition-colors',
+                    'nodrag nopan h-14 w-full rounded-[14px] shadow-lg text-white font-mono tracking-widest uppercase text-xs transition-all duration-300 hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] disabled:hover:translate-y-0 disabled:hover:scale-100',
                     updateSuccess
-                      ? 'bg-[#1a1a1a] hover:bg-[#333]'
-                      : 'bg-[#ff7a45] hover:bg-[#ff692a]',
+                      ? 'bg-[#1a1a1a] hover:bg-[#333] shadow-black/10'
+                      : 'bg-[#ff7a45] hover:bg-[#ff692a] shadow-orange-500/30',
                   ].join(' ')}
                 >
                   {updating ? (

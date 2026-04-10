@@ -17,7 +17,7 @@ export function ArkivOwnedEntitiesPanel() {
   const loadEntityIntoCanvas = useArkivStore((state) => state.loadEntityIntoCanvas);
 
   return (
-    <div className="flex w-[24rem] min-h-0 flex-1 flex-col rounded-[16px] border border-gray-200 bg-white p-5 shadow-md">
+    <div className="flex w-[24rem] min-h-0 flex-1 flex-col rounded-[16px] border border-white/40 bg-white/80 backdrop-blur-xl p-5 shadow-2xl shadow-gray-200/50">
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono">
@@ -31,7 +31,7 @@ export function ArkivOwnedEntitiesPanel() {
         <Button
           variant="outline"
           size="icon-sm"
-          className="rounded-xl border-gray-200"
+          className="rounded-xl border-gray-200 shadow-sm transition-all duration-300 hover:rotate-180 hover:bg-gray-100 hover:shadow-md"
           onClick={refreshOwnedEntities}
           disabled={!account || loadingOwnedEntities}
         >
@@ -67,7 +67,7 @@ export function ArkivOwnedEntitiesPanel() {
                 type="button"
                 onClick={() => loadEntityIntoCanvas(entity.key)}
                 disabled={!entity.compatible || loadingSelectedEntity}
-                className="flex w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 text-left shadow-md transition hover:border-[#ff7a45] hover:bg-[#fff5f0] disabled:cursor-not-allowed disabled:opacity-60"
+                className="group flex w-full items-start justify-between gap-3 rounded-xl border border-transparent bg-white px-4 py-4 text-left shadow-sm ring-1 ring-gray-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-500/10 hover:ring-[#ff7a45] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -98,7 +98,7 @@ export function ArkivOwnedEntitiesPanel() {
                   target="_blank"
                   rel="noreferrer"
                   onClick={(event) => event.stopPropagation()}
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-gray-500 transition hover:bg-white hover:text-black"
+                  className="rounded-lg border border-gray-100 bg-gray-50 p-2 text-gray-400 transition-all duration-300 hover:bg-[#ff7a45] hover:text-white hover:scale-110 hover:shadow-md group-hover:border-transparent"
                   aria-label="Open in Arkiv explorer"
                 >
                   <ExternalLink className="size-3.5" />

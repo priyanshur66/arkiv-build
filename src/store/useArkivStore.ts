@@ -40,6 +40,7 @@ type ArkivState = {
   loadingSelectedEntity: boolean;
   connecting: boolean;
   deploying: boolean;
+  deployingNodeId?: string;
   updating: boolean;
   error?: string;
   networkNudge?: string;
@@ -67,6 +68,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
   loadingSelectedEntity: false,
   connecting: false,
   deploying: false,
+  deployingNodeId: undefined,
   updating: false,
   initialize: async () => {
     if (get().initialized) {
@@ -392,7 +394,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       return;
     }
 
-    set({ deploying: true, error: undefined });
+    set({ deploying: true, deployingNodeId: activeNode.id, error: undefined });
 
     try {
       const { snapshot } = await deployEntityFromDraft({
@@ -414,7 +416,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
           error instanceof Error ? error.message : "Arkiv deployment failed in MetaMask.",
       });
     } finally {
-      set({ deploying: false });
+      set({ deploying: false, deployingNodeId: undefined });
     }
   },
   deployDraft: async (nodeId: string) => {
@@ -436,7 +438,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       return;
     }
 
-    set({ deploying: true, error: undefined });
+    set({ deploying: true, deployingNodeId: node.id, error: undefined });
 
     try {
       const { snapshot } = await deployEntityFromDraft({
@@ -458,7 +460,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
           error instanceof Error ? error.message : 'Arkiv deployment failed in MetaMask.',
       });
     } finally {
-      set({ deploying: false });
+      set({ deploying: false, deployingNodeId: undefined });
     }
   },
   updateActiveEntity: async () => {
