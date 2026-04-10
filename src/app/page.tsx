@@ -2,8 +2,8 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useEffect, useMemo } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Trash2, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
   Background,
   BackgroundVariant,
@@ -31,6 +31,7 @@ function SchemaCanvas() {
   const setActiveNode = useSchemaStore((state) => state.setActiveNode);
   const clearCanvas = useSchemaStore((state) => state.clearCanvas);
   const initializeArkiv = useArkivStore((state) => state.initialize);
+  const [isMenuOpen, setIsMenuOpen] = useState(true);
 
   useEffect(() => {
     void initializeArkiv();
@@ -41,12 +42,28 @@ function SchemaCanvas() {
       <TopNav />
 
       <div className="pointer-events-none absolute inset-0 z-10">
-        <div className="pointer-events-auto absolute top-[140px] bottom-6 left-6 flex min-h-0 flex-col">
-          <div className="flex min-h-0 flex-1 flex-col gap-4">
-            <div className="shrink-0">
+        <div className="absolute top-[140px] bottom-6 left-6 flex min-h-0 flex-col transition-all duration-300">
+          <Button
+            variant={isMenuOpen ? "ghost" : "outline"}
+            className={`pointer-events-auto absolute z-20 flex p-0 items-center justify-center rounded-lg transition-all duration-300 ${
+              isMenuOpen 
+                ? 'h-8 w-8 top-3 left-[334px] text-[#ff7a45] hover:text-[#e66a39] bg-[#fff5f0] hover:bg-[#ffebe0]' 
+                : 'h-10 w-10 top-0 left-0 bg-white border border-gray-200 shadow-sm text-[#ff7a45] hover:text-[#e66a39] hover:bg-[#fff5f0]'
+            }`}
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-5" />}
+          </Button>
+
+          <div 
+            className={`pointer-events-auto flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden transition-all duration-300 ${isMenuOpen ? 'w-[24rem] opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-full'}`}
+          >
+            <div className="shrink-0 w-[24rem]">
               <ArkivToolbar />
             </div>
-            <ArkivOwnedEntitiesPanel />
+            <div className="flex-1 min-h-0 w-[24rem] flex flex-col">
+              <ArkivOwnedEntitiesPanel />
+            </div>
           </div>
         </div>
 

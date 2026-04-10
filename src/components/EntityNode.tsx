@@ -1,7 +1,7 @@
 'use client'
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CheckCircle, Database, ExternalLink, Link, Loader2, Minus, Plus, RefreshCw, Rocket, X } from 'lucide-react'
+import { CheckCircle, Database, ExternalLink, Link, Loader2, Minus, Plus, RefreshCw, Rocket, X, ChevronDown } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,7 @@ const inputClassName =
   'nodrag nopan h-12 w-full rounded-[14px] border border-gray-100 bg-gray-50/50 px-4 font-mono text-sm text-gray-900 outline-none transition duration-200 placeholder:text-gray-400 focus:border-gray-200 focus:bg-gray-100/50 disabled:cursor-not-allowed disabled:opacity-80'
 
 const selectClassName =
-  'nodrag nopan h-12 w-full rounded-[14px] border border-gray-100 bg-gray-50/50 px-4 font-mono text-sm text-gray-900 outline-none transition duration-200 focus:border-gray-200 focus:bg-gray-100/50 disabled:cursor-not-allowed disabled:opacity-80'
+  'nodrag nopan h-12 w-full rounded-[14px] border border-gray-100 bg-gray-50/50 px-4 pr-10 font-mono text-sm text-gray-900 outline-none transition duration-200 focus:border-gray-200 focus:bg-gray-100/50 disabled:cursor-not-allowed disabled:opacity-80 appearance-none'
 
 const sanitizeIdentifier = (val: string) => {
   return val
@@ -194,19 +194,22 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2">
                 {isDraft ? (
-                  <select
-                    value={data.expirationDuration}
-                    onChange={(e) =>
-                      updateExpirationDuration(id, e.target.value as ExpirationDuration)
-                    }
-                    className="nodrag nopan bg-transparent text-sm font-mono text-gray-500 underline underline-offset-4 decoration-gray-300 outline-none cursor-pointer hover:text-gray-700"
-                  >
-                    {EXPIRATION_DURATION_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        EXP: {getDurationLabel(option)}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={data.expirationDuration}
+                      onChange={(e) =>
+                        updateExpirationDuration(id, e.target.value as ExpirationDuration)
+                      }
+                      className="nodrag nopan bg-transparent text-sm font-mono text-gray-500 underline underline-offset-4 decoration-gray-300 outline-none cursor-pointer hover:text-gray-700 appearance-none pr-5 relative z-10"
+                    >
+                      {EXPIRATION_DURATION_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          EXP: {getDurationLabel(option)}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 size-3.5 text-gray-400 pointer-events-none" />
+                  </div>
                 ) : (
                   <span className="text-sm font-mono text-gray-500 underline underline-offset-4 decoration-gray-300">
                     EXP: {getDurationLabel(data.expirationDuration)}
@@ -284,17 +287,20 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                     <p className="mb-2 text-[12px] font-mono font-bold uppercase tracking-widest text-gray-400">
                       Type
                     </p>
-                    <select
-                      value={field.type}
-                      onChange={(e) =>
-                        updateFieldType(id, field.id, e.target.value as IndexedAttributeType)
-                      }
-                      className={`${selectClassName} w-32`}
-                      disabled={isRelation}
-                    >
-                      <option value="indexedString">String</option>
-                      <option value="indexedNumber">Number</option>
-                    </select>
+                    <div className="relative w-32">
+                      <select
+                        value={field.type}
+                        onChange={(e) =>
+                          updateFieldType(id, field.id, e.target.value as IndexedAttributeType)
+                        }
+                        className={selectClassName}
+                        disabled={isRelation}
+                      >
+                        <option value="indexedString">String</option>
+                        <option value="indexedNumber">Number</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
 
                   <button
