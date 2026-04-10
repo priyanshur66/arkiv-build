@@ -452,6 +452,11 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                       <Loader2 className="mr-3 size-4 animate-spin" />
                       Deploying…
                     </>
+                  ) : !account ? (
+                    <>
+                      <Rocket className="mr-3 size-4 opacity-50" />
+                      Connect wallet to deploy
+                    </>
                   ) : hasPendingParent ? (
                     <>
                       <Rocket className="mr-3 size-4 opacity-50" />
