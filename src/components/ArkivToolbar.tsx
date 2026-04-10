@@ -18,7 +18,7 @@ export function ArkivToolbar() {
             <Database className="size-6" />
           </div>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pr-10">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono">
               Visual Modeler
             </p>

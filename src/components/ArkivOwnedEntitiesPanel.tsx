@@ -17,7 +17,7 @@ export function ArkivOwnedEntitiesPanel() {
   const loadEntityIntoCanvas = useArkivStore((state) => state.loadEntityIntoCanvas);
 
   return (
-    <div className="flex w-[24rem] min-h-0 flex-1 flex-col rounded-[16px] border border-white/40 bg-white/80 backdrop-blur-xl p-5 shadow-2xl shadow-gray-200/50">
+    <div className="flex w-[24rem] min-h-0 flex-1 flex-col rounded-[16px] border border-gray-200 bg-white/80 backdrop-blur-xl p-5 shadow-2xl shadow-gray-200/50">
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-500 font-mono">
@@ -60,14 +60,14 @@ export function ArkivOwnedEntitiesPanel() {
             No wallet-owned entities were found on Arkiv Kaolin yet.
           </p>
         ) : (
-          <div className="flex-1 space-y-2 overflow-y-auto pr-2 pb-2">
+          <div className="flex-1 space-y-2 overflow-y-auto px-1 pt-2 pb-2">
             {ownedEntities.map((entity) => (
               <button
                 key={entity.key}
                 type="button"
                 onClick={() => loadEntityIntoCanvas(entity.key)}
                 disabled={!entity.compatible || loadingSelectedEntity}
-                className="group flex w-full items-start justify-between gap-3 rounded-xl border border-transparent bg-white px-4 py-4 text-left shadow-sm ring-1 ring-gray-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-500/10 hover:ring-[#ff7a45] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                className="group flex w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 text-left shadow-sm ring-1 ring-gray-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-500/10 hover:ring-[#ff7a45] hover:border-transparent active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">

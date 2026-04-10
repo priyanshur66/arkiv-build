@@ -66,7 +66,7 @@ function SchemaCanvas() {
       <TopNav />
 
       <div className="pointer-events-none absolute inset-0 z-10">
-        <div className="absolute top-[140px] bottom-6 left-6 flex min-h-0 flex-col transition-all duration-300">
+        <div className="absolute top-[110px] bottom-6 left-6 flex min-h-0 flex-col transition-all duration-300">
           <Button
             variant={isMenuOpen ? "ghost" : "outline"}
             className={`pointer-events-auto absolute z-20 flex p-0 items-center justify-center rounded-lg transition-all duration-300 ${
@@ -91,7 +91,7 @@ function SchemaCanvas() {
           </div>
         </div>
 
-        <div className="pointer-events-auto absolute top-[140px] right-6">
+        <div className="pointer-events-auto absolute top-[110px] right-6">
           <Button
             variant="outline"
             onClick={clearCanvas}
