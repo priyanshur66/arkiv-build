@@ -143,7 +143,11 @@ export const updatePersistedEntity = async ({
     expiresIn: remainingBlocks,
   });
 
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  if (receipt.status === 'reverted') {
+    throw new Error("Transaction failed on-chain.");
+  }
 
   const blockTiming = await fetchBlockTiming();
   const entity = await publicClient.getEntity(entityKey);
@@ -214,7 +218,11 @@ export const deployEntityFromDraft = async ({
     expiresIn: ExpirationTime.fromSeconds(expiresInSeconds),
   });
 
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  if (receipt.status === 'reverted') {
+    throw new Error("Deployment transaction failed on-chain.");
+  }
 
   const blockTiming = await fetchBlockTiming();
   const entity = await publicClient.getEntity(entityKey);

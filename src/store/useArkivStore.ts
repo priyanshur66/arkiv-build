@@ -259,10 +259,12 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
         dataFields: activeNode.data.dataFields,
       });
 
+      schemaStore.setDeployFailed(activeNode.id, false);
       schemaStore.replaceNodeWithPersisted(activeNode.id, snapshot);
       await get().refreshBlockTiming();
       await get().refreshOwnedEntities();
     } catch (error) {
+      schemaStore.setDeployFailed(activeNode.id, true);
       set({
         error:
           error instanceof Error ? error.message : "Arkiv deployment failed in MetaMask.",
@@ -301,10 +303,12 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
         dataFields: node.data.dataFields,
       });
 
+      schemaStore.setDeployFailed(node.id, false);
       schemaStore.replaceNodeWithPersisted(node.id, snapshot);
       await get().refreshBlockTiming();
       await get().refreshOwnedEntities();
     } catch (error) {
+      schemaStore.setDeployFailed(node.id, true);
       set({
         error:
           error instanceof Error ? error.message : 'Arkiv deployment failed in MetaMask.',

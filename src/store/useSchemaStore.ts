@@ -36,6 +36,7 @@ export type EntityNodeData = {
   confirmedExpirationBlock?: string;
   entityData?: string;
   entitySize?: number;
+  deployFailed?: boolean;
 };
 
 export type SchemaNode = Node<EntityNodeData, "entity">;
@@ -79,6 +80,7 @@ type SchemaState = {
   updateDataFieldKey: (nodeId: string, fieldId: string, key: string) => void;
   updateDataFieldValue: (nodeId: string, fieldId: string, value: string) => void;
   updateEntityData: (nodeId: string, entityData: string) => void;
+  setDeployFailed: (nodeId: string, failed: boolean) => void;
   removeNode: (nodeId: string) => void;
 };
 
@@ -492,4 +494,14 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
             : state.activeNodeId,
       };
     }),
+  setDeployFailed: (nodeId, failed) =>
+    set((state) => ({
+      nodes: updateNodeById(state.nodes, nodeId, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          deployFailed: failed,
+        },
+      })),
+    })),
 }));

@@ -168,7 +168,7 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
           'overflow-hidden rounded-[24px] bg-white transition-all',
           selected
             ? 'border-[2px] border-[#ff7a45] shadow-lg ring-[6px] ring-[#ff7a45]/10'
-            : 'border-[2px] border-[#ff7a45] shadow-sm',
+            : 'border-[2px] border-[#ff7a45] shadow-md',
         ].join(' ')}
       >
         {/* ------------------------------------------------------------------ Header */}
@@ -295,7 +295,7 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
 
                   <button
                     onClick={() => removeField(id, field.id)}
-                    className="nodrag nopan mb-1 flex size-10 shrink-0 items-center justify-center rounded-xl text-gray-400 border border-gray-100 bg-white shadow-sm transition hover:bg-gray-50 hover:text-red-500"
+                    className="nodrag nopan mb-1 flex size-10 shrink-0 items-center justify-center rounded-xl text-gray-400 border border-gray-100 bg-white shadow-md transition hover:bg-gray-50 hover:text-red-500"
                     title={isRelation ? "Remove relation (also removes edge)" : "Remove field"}
                   >
                     <Minus className="size-4" />
@@ -351,7 +351,7 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                     </div>
                     <button
                       onClick={() => removeDataField(id, df.id)}
-                      className="nodrag nopan mb-1 flex size-10 shrink-0 items-center justify-center rounded-xl text-gray-400 border border-gray-100 bg-white shadow-sm transition hover:bg-gray-50 hover:text-red-500"
+                      className="nodrag nopan mb-1 flex size-10 shrink-0 items-center justify-center rounded-xl text-gray-400 border border-gray-100 bg-white shadow-md transition hover:bg-gray-50 hover:text-red-500"
                       title="Remove data field"
                     >
                       <Minus className="size-4" />
@@ -444,6 +444,11 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
                     <>
                       <Rocket className="mr-3 size-4 opacity-50" />
                       Blocked
+                    </>
+                  ) : data.deployFailed ? (
+                    <>
+                      <Rocket className="mr-3 size-4" />
+                      Redeploy to Arkiv Kaolin
                     </>
                   ) : (
                     <>

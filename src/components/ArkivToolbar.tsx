@@ -12,7 +12,7 @@ export function ArkivToolbar() {
 
   return (
     <div className="w-[24rem] space-y-4">
-      <div className="rounded-[16px] border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="rounded-[16px] border border-gray-200 bg-white p-5 shadow-md">
         <div className="flex items-center gap-4">
           <div className="flex size-12 items-center justify-center rounded-xl bg-gray-100 text-[#ff7a45]">
             <Database className="size-6" />
