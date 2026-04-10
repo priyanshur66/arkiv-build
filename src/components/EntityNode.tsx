@@ -1,7 +1,7 @@
 'use client'
 
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { CheckCircle, Database, ExternalLink, Loader2, Minus, Plus, RefreshCw, Rocket, X } from 'lucide-react'
+import { CheckCircle, Database, ExternalLink, Link, Loader2, Minus, Plus, RefreshCw, Rocket, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -241,56 +241,85 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
               </div>
             )}
 
-            {data.fields.map((field) => (
-              <div
-                key={field.id}
-                className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-2 rounded-[22px] border border-white/70 bg-white/70 p-2.5 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.24)] backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/55"
-              >
-                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-                  <span
-                    className={[
-                      'ml-2 size-2 rounded-full shrink-0',
-                      field.type === 'indexedNumber'
-                        ? 'bg-sky-400 dark:bg-sky-500'
-                        : 'bg-violet-400 dark:bg-violet-500',
-                    ].join(' ')}
-                  />
+            {data.fields.map((field) => {
+              const isRelation = !!field.edgeId;
+
+              return (
+                <div
+                  key={field.id}
+                  className={[
+                    'grid grid-cols-[1fr_1fr_auto_auto] items-center gap-2 rounded-[22px] border p-2.5 shadow-[0_12px_30px_-20px_rgba(15,23,42,0.24)] backdrop-blur transition-all',
+                    isRelation
+                      ? 'border-indigo-200/80 bg-indigo-50/50 dark:border-indigo-500/20 dark:bg-indigo-500/10'
+                      : 'border-white/70 bg-white/70 dark:border-slate-800/80 dark:bg-slate-950/55'
+                  ].join(' ')}
+                >
+                  <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                    {isRelation ? (
+                      <div className="ml-1.5 flex size-4 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400 shrink-0">
+                        <Link className="size-2.5" />
+                      </div>
+                    ) : (
+                      <span
+                        className={[
+                          'ml-2 size-2 rounded-full shrink-0',
+                          field.type === 'indexedNumber'
+                            ? 'bg-sky-400 dark:bg-sky-500'
+                            : 'bg-violet-400 dark:bg-violet-500',
+                        ].join(' ')}
+                      />
+                    )}
+                    <input
+                      value={field.name}
+                      onChange={(e) => updateFieldName(id, field.id, e.target.value)}
+                      className={`${inputClassName} h-10 min-w-0 border-transparent bg-transparent px-1 shadow-none dark:bg-transparent ${isRelation ? 'font-medium text-indigo-700 dark:text-indigo-300' : ''}`}
+                      placeholder="e.g. name"
+                    />
+                  </div>
+
                   <input
-                    value={field.name}
-                    onChange={(e) => updateFieldName(id, field.id, e.target.value)}
-                    className={`${inputClassName} h-10 min-w-0 border-transparent bg-transparent px-1 shadow-none dark:bg-transparent`}
-                    placeholder="e.g. name"
+                    value={field.value}
+                    onChange={(e) => updateFieldValue(id, field.id, e.target.value)}
+                    disabled={isRelation}
+                    className={`${inputClassName} h-10 min-w-0 ${
+                      isRelation && !field.value
+                        ? 'text-indigo-400/70 italic dark:text-indigo-300/50'
+                        : isRelation
+                        ? 'text-indigo-600 font-mono text-[10px] bg-indigo-100/50 border-indigo-200/60 dark:bg-indigo-900/30 dark:border-indigo-500/30'
+                        : ''
+                    }`}
+                    placeholder={
+                      isRelation
+                        ? 'Pending deployment…'
+                        : field.type === 'indexedNumber'
+                        ? '0'
+                        : 'Initial value…'
+                    }
+                    inputMode={field.type === 'indexedNumber' ? 'decimal' : 'text'}
                   />
+
+                  <select
+                    value={field.type}
+                    onChange={(e) =>
+                      updateFieldType(id, field.id, e.target.value as IndexedAttributeType)
+                    }
+                    className={`${selectClassName} h-10 min-w-44 disabled:opacity-60`}
+                    disabled={isRelation}
+                  >
+                    <option value="indexedString">String</option>
+                    <option value="indexedNumber">Number</option>
+                  </select>
+
+                  <button
+                    onClick={() => removeField(id, field.id)}
+                    className="nodrag nopan flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                    title={isRelation ? "Remove relation (also removes edge)" : "Remove field"}
+                  >
+                    <Minus className="size-4" />
+                  </button>
                 </div>
-
-                <input
-                  value={field.value}
-                  onChange={(e) => updateFieldValue(id, field.id, e.target.value)}
-                  className={`${inputClassName} h-10 min-w-0`}
-                  placeholder={field.type === 'indexedNumber' ? '0' : 'Initial value…'}
-                  inputMode={field.type === 'indexedNumber' ? 'decimal' : 'text'}
-                />
-
-                <select
-                  value={field.type}
-                  onChange={(e) =>
-                    updateFieldType(id, field.id, e.target.value as IndexedAttributeType)
-                  }
-                  className={`${selectClassName} h-10 min-w-44`}
-                >
-                  <option value="indexedString">String</option>
-                  <option value="indexedNumber">Number</option>
-                </select>
-
-                <button
-                  onClick={() => removeField(id, field.id)}
-                  className="nodrag nopan flex size-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                  title="Remove field"
-                >
-                  <Minus className="size-4" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
 
             <Button
               size="sm"

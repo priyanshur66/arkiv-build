@@ -14,6 +14,8 @@ export type EntityField = {
   name: string;
   type: IndexedAttributeType;
   value: string;
+  edgeId?: string;
+  relationNodeId?: string;
 };
 
 export type EntityDataField = {

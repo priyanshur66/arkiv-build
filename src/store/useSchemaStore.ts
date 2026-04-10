@@ -161,19 +161,73 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       };
     }),
   onEdgesChange: (changes) =>
-    set((state) => ({
-      edges: applyEdgeChanges(changes, state.edges),
-    })),
+    set((state) => {
+      const edges = applyEdgeChanges(changes, state.edges);
+      
+      const removedEdgeIds = changes
+        .filter((c) => c.type === "remove")
+        .map((c) => c.id);
+
+      let nodes = state.nodes;
+      if (removedEdgeIds.length > 0) {
+        nodes = nodes.map((node) => {
+          const hasEdgeField = node.data.fields.some(
+            (f) => f.edgeId && removedEdgeIds.includes(f.edgeId)
+          );
+          if (!hasEdgeField) return node;
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              fields: node.data.fields.filter(
+                (f) => !f.edgeId || !removedEdgeIds.includes(f.edgeId)
+              ),
+            },
+          };
+        });
+      }
+
+      return { edges, nodes };
+    }),
   onConnect: (connection) =>
-    set((state) => ({
-      edges: addEdge(
-        {
-          ...connection,
-          animated: true,
+    set((state) => {
+      const edgeId = `xy-edge__${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`;
+      const newEdge = {
+        ...connection,
+        id: edgeId,
+        animated: true,
+      };
+
+      const edges = addEdge(newEdge, state.edges);
+
+      const sourceNode = state.nodes.find((n) => n.id === connection.source);
+      const targetNode = state.nodes.find((n) => n.id === connection.target);
+
+      if (!sourceNode || !targetNode) return { edges };
+
+      const targetLabelRaw = targetNode.data.label || "entity";
+      const targetLabel =
+        targetLabelRaw.charAt(0).toLowerCase() + targetLabelRaw.slice(1);
+
+      const newField: EntityField = {
+        id: `field-${crypto.randomUUID()}`,
+        name: `${targetLabel}Id`,
+        type: "indexedString",
+        value: targetNode.data.entityKey || "",
+        edgeId: newEdge.id,
+        relationNodeId: targetNode.id,
+      };
+
+      const nodes = updateNodeById(state.nodes, sourceNode.id, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          fields: [...node.data.fields, newField],
         },
-        state.edges,
-      ),
-    })),
+      }));
+
+      return { edges, nodes };
+    }),
   addDraftEntity: () =>
     set((state) => {
       const nextNode = { ...createDraftEntityNode(state.nodes.length), selected: true };
@@ -234,16 +288,32 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       };
     }),
   replaceNodeWithPersisted: (nodeId, snapshot) =>
-    set((state) => ({
-      nodes: markSelectedNode(
-        updateNodeById(state.nodes, nodeId, (node) => ({
-          ...node,
-          data: mapSnapshotToNodeData(snapshot),
-        })),
-        nodeId,
-      ),
-      activeNodeId: nodeId,
-    })),
+    set((state) => {
+      let nodes = updateNodeById(state.nodes, nodeId, (node) => ({
+        ...node,
+        data: mapSnapshotToNodeData(snapshot),
+      }));
+
+      nodes = nodes.map((node) => {
+        let modified = false;
+        const newFields = node.data.fields.map((field) => {
+          if (field.relationNodeId === nodeId && !field.value) {
+            modified = true;
+            return { ...field, value: snapshot.entityKey };
+          }
+          return field;
+        });
+        if (modified) {
+          return { ...node, data: { ...node.data, fields: newFields } };
+        }
+        return node;
+      });
+
+      return {
+        nodes: markSelectedNode(nodes, nodeId),
+        activeNodeId: nodeId,
+      };
+    }),
   updateEntityName: (nodeId, name) =>
     set((state) => ({
       nodes: updateNodeById(state.nodes, nodeId, (node) => ({
@@ -275,15 +345,26 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       })),
     })),
   removeField: (nodeId, fieldId) =>
-    set((state) => ({
-      nodes: updateNodeById(state.nodes, nodeId, (node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          fields: node.data.fields.filter((field) => field.id !== fieldId),
-        },
-      })),
-    })),
+    set((state) => {
+      const node = state.nodes.find((n) => n.id === nodeId);
+      const field = node?.data.fields.find((f) => f.id === fieldId);
+      
+      let edges = state.edges;
+      if (field?.edgeId) {
+        edges = edges.filter((e) => e.id !== field.edgeId);
+      }
+
+      return {
+        nodes: updateNodeById(state.nodes, nodeId, (node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            fields: node.data.fields.filter((field) => field.id !== fieldId),
+          },
+        })),
+        edges,
+      };
+    }),
   addDataField: (nodeId) =>
     set((state) => ({
       nodes: updateNodeById(state.nodes, nodeId, (node) => ({
@@ -376,7 +457,22 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
     })),
   removeNode: (nodeId) =>
     set((state) => {
-      const nodes = state.nodes.filter((node) => node.id !== nodeId);
+      let nodes = state.nodes.filter((node) => node.id !== nodeId);
+      
+      nodes = nodes.map((node) => {
+        const hasDanglingRelation = node.data.fields.some(
+          (f) => f.relationNodeId === nodeId,
+        );
+        if (!hasDanglingRelation) return node;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            fields: node.data.fields.filter((f) => f.relationNodeId !== nodeId),
+          },
+        };
+      });
+
       return {
         nodes,
         edges: state.edges.filter(
