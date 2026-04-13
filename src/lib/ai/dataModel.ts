@@ -436,7 +436,10 @@ const calculateDescendantCounts = (
 
   const memo = new Map<string, number>()
 
-  const getDescendantCount = (schemaName: string, trail = new Set<string>()) => {
+  const getDescendantCount = (
+    schemaName: string,
+    trail: Set<string> = new Set<string>(),
+  ): number => {
     const existing = memo.get(schemaName)
     if (existing !== undefined) {
       return existing
