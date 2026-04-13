@@ -3,7 +3,13 @@
 import "@xyflow/react/dist/style.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Trash2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import {
+  Trash2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  Wand2,
+} from "lucide-react";
 import {
   Background,
   BackgroundVariant,
@@ -17,6 +23,7 @@ import {
 import { ArkivOwnedEntitiesPanel } from "@/components/ArkivOwnedEntitiesPanel";
 import { ArkivToolbar } from "@/components/ArkivToolbar";
 import { TopNav } from "@/components/TopNav";
+import { UseCasePromptPanel } from "@/components/UseCasePromptPanel";
 import { Button } from "@/components/ui/button";
 import { EntityNode } from "@/components/EntityNode";
 import { useArkivStore } from "@/store/useArkivStore";
@@ -39,6 +46,7 @@ function SchemaCanvas() {
   const clearCanvas = useSchemaStore((state) => state.clearCanvas);
   const initializeArkiv = useArkivStore((state) => state.initialize);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const { setCenter, getNodes } = useReactFlow();
   const previousNodeIdsRef = useRef<Set<string>>(new Set());
   const nodeIdsKey = useMemo(() => nodes.map((node) => node.id).join('|'), [nodes]);
@@ -119,21 +127,55 @@ function SchemaCanvas() {
           </div>
         </div>
 
-        <div className="pointer-events-auto absolute top-[110px] right-6">
+        <div className="pointer-events-auto absolute top-[110px] right-6 z-20 flex flex-col items-end gap-4">
           <Button
             variant="outline"
             onClick={clearCanvas}
-            className="flex h-10 items-center gap-2 rounded-xl border-red-200 bg-red-50 px-4 font-bold shadow-sm transition hover:bg-red-100 text-[#ff3b30] hover:text-red-600"
+            className="ml-auto flex h-10 items-center gap-2 rounded-xl border-red-200 bg-red-50 px-4 font-bold shadow-sm transition hover:bg-red-100 text-[#ff3b30] hover:text-red-600"
           >
             <Trash2 className="size-4" />
             Clear Canvas
           </Button>
+
+          <div className="relative">
+            <Button
+              variant={isAiPanelOpen ? "ghost" : "outline"}
+              className={`absolute z-20 flex items-center justify-center rounded-xl transition-all duration-300 ${
+                isAiPanelOpen
+                  ? "h-8 w-8 top-3 right-[25rem] border border-[#ffbe9f] bg-[#fff5f0] text-[#ff7a45] hover:bg-[#ffe8db] hover:text-[#e66a39]"
+                  : "h-11 w-11 top-0 right-0 border border-[#ffbe9f] bg-white text-[#ff7a45] shadow-sm hover:bg-[#fff5f0] hover:text-[#e66a39]"
+              }`}
+              onClick={() => setIsAiPanelOpen((open) => !open)}
+              title={isAiPanelOpen ? "Collapse AI generator" : "Open AI generator"}
+            >
+              {isAiPanelOpen ? (
+                <PanelRightClose className="size-4" />
+              ) : (
+                <Wand2 className="size-5" />
+              )}
+            </Button>
+
+            <div
+              className={`overflow-hidden transition-all duration-300 ${
+                isAiPanelOpen
+                  ? "w-[24rem] opacity-100 translate-x-0"
+                  : "w-0 opacity-0 translate-x-6"
+              }`}
+            >
+              <div className="w-[24rem]">
+                <UseCasePromptPanel />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div
         className="absolute inset-0 transition-all duration-300"
-        style={{ paddingLeft: isMenuOpen ? '416px' : '0px', paddingTop: '80px' }}
+        style={{
+          paddingLeft: isMenuOpen ? '416px' : '0px',
+          paddingTop: '80px',
+        }}
       >
         <ReactFlow
           nodes={nodes}

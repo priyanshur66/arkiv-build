@@ -315,6 +315,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
 
       const nodes: SchemaNode[] = [];
       const edges: SchemaEdge[] = [];
+      const seenEdgeIds = new Set<string>();
 
       for (const [lvl, keys] of levelGroups.entries()) {
         keys.forEach((key, index) => {
@@ -342,7 +343,16 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
         for (const field of node.snapshot.fields) {
           if (nodesMap.has(field.value as Hex)) {
             const sourceId = `entity-${field.value}`;
-            const edgeId = `xy-edge__${sourceId}-null-${targetId}-null`;
+            const edgeBaseId = `xy-edge__${sourceId}-null-${targetId}-null-${field.name}`;
+            let edgeId = edgeBaseId;
+            let duplicateIndex = 2;
+
+            while (seenEdgeIds.has(edgeId)) {
+              edgeId = `${edgeBaseId}-${duplicateIndex}`;
+              duplicateIndex += 1;
+            }
+
+            seenEdgeIds.add(edgeId);
             
             field.edgeId = edgeId;
             field.relationNodeId = sourceId;

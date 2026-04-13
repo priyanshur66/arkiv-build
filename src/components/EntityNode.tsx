@@ -20,6 +20,9 @@ const inputClassName =
 const selectClassName =
   'nodrag nopan h-12 w-full rounded-[14px] border border-gray-100 bg-gray-50/50 px-4 pr-10 font-mono text-sm text-gray-900 outline-none transition duration-200 focus:border-gray-200 focus:bg-gray-100/50 disabled:cursor-not-allowed disabled:opacity-80 appearance-none'
 
+const compactToggleClassName =
+  'nodrag nopan rounded-lg border border-[#ffbe9f] bg-[#fff5f0] px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-[#ff7a45] transition hover:border-[#ff7a45] hover:bg-[#ffe8db] hover:text-[#e66a39]'
+
 const sanitizeIdentifier = (val: string) => {
   return val
     .replace(/\s+/g, '_')            // Replace spaces with underscores
@@ -151,11 +154,8 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
   }
 
   const nodes = useSchemaStore((s) => s.nodes)
-  const persistedNodeCount = useMemo(
-    () => nodes.filter((node) => node.data.mode === 'persisted').length,
-    [nodes],
-  )
-  const shouldUseCompactCards = !isDraft && persistedNodeCount > 3
+  const totalNodeCount = nodes.length
+  const shouldUseCompactCards = totalNodeCount > 3
   const [attributesExpanded, setAttributesExpanded] = useState(false)
 
   const pendingParentNodes = useMemo(() => {
@@ -222,12 +222,12 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
 
             <button
               onClick={() => setAttributesExpanded(true)}
-              className="nodrag nopan flex h-10 w-full items-center justify-between rounded-[12px] border border-dashed border-gray-300 px-3 text-left transition hover:border-[#ff7a45] hover:bg-orange-50/40"
+              className="nodrag nopan flex h-10 w-full items-center justify-between rounded-[12px] border border-[#ffbe9f] bg-[#fff5f0] px-3 text-left transition hover:border-[#ff7a45] hover:bg-[#ffe8db]"
             >
-              <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-gray-500">
-                Click to expand attributes
+              <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-[#ff7a45]">
+                Expand Attributes
               </span>
-              <ChevronDown className="size-4 text-gray-400" />
+              <ChevronDown className="size-4 text-[#ff7a45]" />
             </button>
           </div>
         </div>
@@ -302,7 +302,7 @@ export function EntityNode({ id, data, selected }: NodeProps<SchemaNode>) {
               {shouldUseCompactCards ? (
                 <button
                   onClick={() => setAttributesExpanded(false)}
-                  className="nodrag nopan rounded-lg border border-gray-200 px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-gray-500 transition hover:border-[#ff7a45] hover:bg-orange-50/40 hover:text-[#ff7a45]"
+                  className={compactToggleClassName}
                   title="Collapse attributes"
                 >
                   Collapse

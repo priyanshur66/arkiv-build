@@ -1,14 +1,14 @@
-"use client";
+'use client'
 
-import { Database, Plus } from "lucide-react";
+import { Database, Plus } from 'lucide-react'
 
-import { Button } from "@/components/ui/button";
-import { useSchemaStore } from "@/store/useSchemaStore";
-import { useArkivStore } from "@/store/useArkivStore";
+import { Button } from '@/components/ui/button'
+import { useSchemaStore } from '@/store/useSchemaStore'
+import { useArkivStore } from '@/store/useArkivStore'
 
 export function ArkivToolbar() {
-  const addDraftEntity = useSchemaStore((state) => state.addDraftEntity);
-  const error = useArkivStore((state) => state.error);
+  const addDraftEntity = useSchemaStore((state) => state.addDraftEntity)
+  const error = useArkivStore((state) => state.error)
 
   return (
     <div className="w-[24rem] space-y-4">
@@ -23,7 +23,7 @@ export function ArkivToolbar() {
               Visual Modeler
             </p>
             <p className="mt-1 text-sm text-gray-700">
-              Create, view, edit and deploy Arkiv schemas.
+              Create, generate, edit, and deploy Arkiv schemas.
             </p>
           </div>
         </div>
@@ -45,5 +45,5 @@ export function ArkivToolbar() {
         ) : null}
       </div>
     </div>
-  );
+  )
 }
