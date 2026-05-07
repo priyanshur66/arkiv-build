@@ -5,6 +5,7 @@ import type {
   ExpirationDuration,
   IndexedAttributeType,
 } from '@/lib/arkiv/types'
+import { sanitizeIdentifier } from '@/lib/arkiv/schema'
 
 const EXPIRATION_DURATIONS: ExpirationDuration[] = ['1d', '7d', '30d', '90d', '365d']
 const ENTITY_START_X = 96
@@ -53,12 +54,6 @@ type NamedGeneratedEntity = GeneratedEntity & {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
-
-export const sanitizeIdentifier = (value: string) =>
-  value
-    .replace(/\s+/g, '_')
-    .replace(/^[^\p{L}_]+/u, '')
-    .replace(/[^\p{L}\p{N}_]/gu, '')
 
 const ensureString = (value: unknown, fallback = '') =>
   typeof value === 'string' ? value : fallback

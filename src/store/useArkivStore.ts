@@ -5,6 +5,10 @@ import type { Hex } from "viem";
 
 import { isArkivKaolinChain } from "@/lib/arkiv/chain";
 import {
+  buildCanvasGraphFromSnapshots,
+  findConnectedEntityKeys,
+} from "@/lib/arkiv/entityGraph";
+import {
   deployEntityFromDraft,
   fetchBlockTiming,
   fetchEntityDetails,
@@ -12,6 +16,7 @@ import {
   updatePersistedEntity,
 } from "@/lib/arkiv/entities";
 import type { BlockTimingState, OwnedArkivEntitySummary } from "@/lib/arkiv/types";
+import { getErrorMessage } from "@/lib/errors";
 import {
   connectMetaMask,
   ensureArkivNetworkReady,
@@ -23,9 +28,6 @@ import {
 } from "@/lib/arkiv/wallet";
 import {
   useSchemaStore,
-  mapSnapshotToNodeData,
-  type SchemaNode,
-  type SchemaEdge,
 } from "@/store/useSchemaStore";
 
 type ArkivState = {
@@ -92,7 +94,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       await get().refreshBlockTiming();
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : "Failed to fetch Kaolin block timing.",
+        error: getErrorMessage(error, "Failed to fetch Kaolin block timing."),
       });
     }
 
@@ -167,10 +169,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       await get().refreshOwnedEntities();
     } catch (error) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : "MetaMask connection to Arkiv Kaolin failed.",
+        error: getErrorMessage(error, "MetaMask connection to Arkiv Kaolin failed."),
       });
     } finally {
       set({ connecting: false });
@@ -195,10 +194,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       }
     } catch (error) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Switching MetaMask to Arkiv Kaolin failed.",
+        error: getErrorMessage(error, "Switching MetaMask to Arkiv Kaolin failed."),
       });
     }
   },
@@ -230,10 +226,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       set({ ownedEntities });
     } catch (error) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to load wallet-owned Arkiv entities.",
+        error: getErrorMessage(error, "Failed to load wallet-owned Arkiv entities."),
       });
     } finally {
       set({ loadingOwnedEntities: false });
@@ -244,142 +237,22 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
 
     try {
       const { ownedEntities, blockTiming } = get();
-
-      const connectedKeys = new Set<Hex>();
-      const queue = [entityKey];
-
-      while (queue.length > 0) {
-        const currentKey = queue.shift()!;
-        if (connectedKeys.has(currentKey)) continue;
-
-        connectedKeys.add(currentKey);
-
-        const summary = ownedEntities.find((e) => e.key === currentKey);
-        if (!summary) continue;
-
-        const parentKeys = (summary.fields ?? [])
-          .map((f) => f.value as Hex)
-          .filter(
-            (val) => val.startsWith("0x") && val.length === 66 && ownedEntities.some((e) => e.key === val)
-          );
-
-        const downstreamKeys = ownedEntities
-          .filter((e) => (e.fields ?? []).some((f) => f.value === currentKey))
-          .map((e) => e.key);
-
-        for (const k of [...parentKeys, ...downstreamKeys]) {
-          if (!connectedKeys.has(k)) queue.push(k);
-        }
-      }
+      const connectedKeys = findConnectedEntityKeys(entityKey, ownedEntities);
 
       const snapshots = await Promise.all(
         Array.from(connectedKeys).map((key) => fetchEntityDetails(key, blockTiming))
       );
 
-      const nodesMap = new Map<Hex, { snapshot: any; parent: Hex[]; level: number }>();
-      for (const snapshot of snapshots) {
-        const parentKeys = snapshot.fields
-          .map((f) => f.value as Hex)
-          .filter((val) => connectedKeys.has(val));
-
-        nodesMap.set(snapshot.entityKey, {
-          snapshot,
-          parent: parentKeys,
-          level: 0,
-        });
-      }
-
-      let changed = true;
-      let iterations = 0;
-      while (changed && iterations < 100) {
-        changed = false;
-        for (const node of nodesMap.values()) {
-          const maxParentLevel = node.parent.length > 0
-            ? Math.max(...node.parent.map((uk) => nodesMap.get(uk)!.level))
-            : -1;
-          
-          if (node.level !== maxParentLevel + 1) {
-            node.level = maxParentLevel + 1;
-            changed = true;
-          }
-        }
-        iterations++;
-      }
-
-      const levelGroups = new Map<number, Hex[]>();
-      for (const [key, node] of nodesMap.entries()) {
-        const lvl = node.level;
-        if (!levelGroups.has(lvl)) levelGroups.set(lvl, []);
-        levelGroups.get(lvl)!.push(key);
-      }
-
-      const nodes: SchemaNode[] = [];
-      const edges: SchemaEdge[] = [];
-      const seenEdgeIds = new Set<string>();
-
-      for (const [lvl, keys] of levelGroups.entries()) {
-        keys.forEach((key, index) => {
-          const nodeInfo = nodesMap.get(key)!;
-          const nodeId = `entity-${key}`;
-          
-          const x = 96 + lvl * 600;
-          const y = 140 + index * 300;
-
-          const mappedData = mapSnapshotToNodeData(nodeInfo.snapshot);
-          
-          nodes.push({
-            id: nodeId,
-            type: "entity",
-            position: { x, y },
-            data: mappedData,
-            selected: key === entityKey,
-          });
-        });
-      }
-
-      for (const node of nodesMap.values()) {
-        const targetId = `entity-${node.snapshot.entityKey}`;
-        
-        for (const field of node.snapshot.fields) {
-          if (nodesMap.has(field.value as Hex)) {
-            const sourceId = `entity-${field.value}`;
-            const edgeBaseId = `xy-edge__${sourceId}-null-${targetId}-null-${field.name}`;
-            let edgeId = edgeBaseId;
-            let duplicateIndex = 2;
-
-            while (seenEdgeIds.has(edgeId)) {
-              edgeId = `${edgeBaseId}-${duplicateIndex}`;
-              duplicateIndex += 1;
-            }
-
-            seenEdgeIds.add(edgeId);
-            
-            field.edgeId = edgeId;
-            field.relationNodeId = sourceId;
-
-            edges.push({
-              id: edgeId,
-              source: sourceId,
-              target: targetId,
-              sourceHandle: undefined,
-              targetHandle: undefined,
-              animated: true,
-            });
-          }
-        }
-      }
-
-      for (const node of nodes) {
-        const fullSn = nodesMap.get(node.id.replace('entity-', '') as Exclude<Hex, string> | Hex)!.snapshot;
-        node.data.fields = fullSn.fields;
-      }
+      const { nodes, edges } = buildCanvasGraphFromSnapshots({
+        snapshots,
+        selectedEntityKey: entityKey,
+      });
 
       useSchemaStore.getState().loadGraphOfEntities(nodes, edges);
 
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : "Failed to fetch the selected Arkiv entity.",
+        error: getErrorMessage(error, "Failed to fetch the selected Arkiv entity."),
       });
     } finally {
       set({ loadingSelectedEntity: false });
@@ -404,30 +277,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       return;
     }
 
-    set({ deploying: true, deployingNodeId: activeNode.id, error: undefined });
-
-    try {
-      const { snapshot } = await deployEntityFromDraft({
-        account,
-        label: activeNode.data.label,
-        fields: activeNode.data.fields,
-        expirationDuration: activeNode.data.expirationDuration,
-        dataFields: activeNode.data.dataFields,
-      });
-
-      schemaStore.setDeployFailed(activeNode.id, false);
-      schemaStore.replaceNodeWithPersisted(activeNode.id, snapshot);
-      await get().refreshBlockTiming();
-      await get().refreshOwnedEntities();
-    } catch (error) {
-      schemaStore.setDeployFailed(activeNode.id, true);
-      set({
-        error:
-          error instanceof Error ? error.message : "Arkiv deployment failed in MetaMask.",
-      });
-    } finally {
-      set({ deploying: false, deployingNodeId: undefined });
-    }
+    await get().deployDraft(activeNode.id);
   },
   deployDraft: async (nodeId: string) => {
     const { account } = get();
@@ -466,8 +316,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     } catch (error) {
       schemaStore.setDeployFailed(node.id, true);
       set({
-        error:
-          error instanceof Error ? error.message : 'Arkiv deployment failed in MetaMask.',
+        error: getErrorMessage(error, 'Arkiv deployment failed in MetaMask.'),
       });
     } finally {
       set({ deploying: false, deployingNodeId: undefined });
@@ -539,8 +388,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       await get().refreshOwnedEntities();
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : 'Arkiv update transaction failed.',
+        error: getErrorMessage(error, 'Arkiv update transaction failed.'),
       });
     } finally {
       set({ updating: false });

@@ -23,6 +23,7 @@ import type {
   PersistedEntitySnapshot,
   SystemAttribute,
 } from "@/lib/arkiv/types";
+import { mapSnapshotToNodeData } from "@/lib/arkiv/entityGraph";
 
 export type EntityNodeData = {
   mode: EntityNodeMode;
@@ -143,22 +144,6 @@ const markSelectedNode = (nodes: SchemaNode[], nodeId: string) =>
     ...node,
     selected: node.id === nodeId,
   }));
-
-export const mapSnapshotToNodeData = (
-  snapshot: PersistedEntitySnapshot & { expirationDuration: ExpirationDuration },
-): EntityNodeData => ({
-  mode: "persisted",
-  label: snapshot.label,
-  expirationDuration: snapshot.expirationDuration,
-  fields: snapshot.fields,
-  dataFields: [],
-  entityKey: snapshot.entityKey,
-  explorerUrl: snapshot.explorerUrl,
-  systemAttributes: snapshot.systemAttributes,
-  confirmedExpirationBlock: snapshot.confirmedExpirationBlock,
-  entityData: snapshot.entityData,
-  entitySize: snapshot.entitySize,
-});
 
 export const useSchemaStore = create<SchemaState>((set, get) => ({
   nodes: [{ ...createDraftEntityNode(ENTITY_START_POSITION), selected: true }],

@@ -49,6 +49,15 @@ export function UseCasePromptPanel() {
       const currentModel = hasExistingModel
         ? serializeCanvasToGeneratedDataModel(nodes, edges)
         : undefined
+      const requestSummary = {
+        mode,
+        useCaseLength: trimmedUseCase.length,
+        hasExistingModel,
+        currentEntityCount: currentModel?.entities.length ?? 0,
+        currentRelationCount: currentModel?.relations.length ?? 0,
+      }
+
+      console.info('[ai:data-model:client] sending request', requestSummary)
 
       const response = await fetch('/api/ai/data-model', {
         method: 'POST',
@@ -63,6 +72,13 @@ export function UseCasePromptPanel() {
       })
 
       const payload = (await response.json()) as GenerateModelResponse
+      console.info('[ai:data-model:client] response received', {
+        status: response.status,
+        ok: response.ok,
+        model: payload.model,
+        hasDataModel: Boolean(payload.dataModel),
+        error: payload.error,
+      })
 
       if (!response.ok || !payload.dataModel) {
         throw new Error(payload.error || 'Failed to generate a deployable data model.')
@@ -78,7 +94,7 @@ export function UseCasePromptPanel() {
 
       setUseCase('')
     } catch (nextError) {
-      void nextError
+      console.error('[ai:data-model:client] request failed', nextError)
       setError(MODEL_UNAVAILABLE_MESSAGE)
     } finally {
       setIsGenerating(false)
