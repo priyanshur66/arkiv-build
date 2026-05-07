@@ -4,7 +4,7 @@ import "viem/window";
 
 import { formatEther, type Hex } from "viem";
 
-import { ARKIV_CHAIN, ARKIV_CHAIN_HEX, isArkivKaolinChain } from "@/lib/arkiv/chain";
+import { ARKIV_CHAIN, ARKIV_CHAIN_HEX, isArkivBragaChain } from "@/lib/arkiv/chain";
 
 type WalletEvents = {
   onAccountsChanged?: (account?: Hex) => void;
@@ -61,7 +61,7 @@ export const getAccountBalance = async (account: Hex) => {
   return "0";
 };
 
-export const switchToArkivKaolin = async () => {
+export const switchToArkivBraga = async () => {
   if (!window.ethereum) {
     throw new Error("MetaMask is not installed.");
   }
@@ -105,7 +105,7 @@ export const connectMetaMask = async () => {
     throw new Error("MetaMask is not installed.");
   }
 
-  await switchToArkivKaolin();
+  await switchToArkivBraga();
 
   const accounts = await window.ethereum.request({
     method: "eth_requestAccounts",
@@ -125,11 +125,11 @@ export const ensureArkivNetworkReady = async () => {
 
   const chainId = await getInjectedChainId();
 
-  if (isArkivKaolinChain(chainId)) {
+  if (isArkivBragaChain(chainId)) {
     return;
   }
 
-  await switchToArkivKaolin();
+  await switchToArkivBraga();
 };
 
 export const subscribeWalletEvents = ({ onAccountsChanged, onChainChanged }: WalletEvents) => {

@@ -7,7 +7,7 @@ import { ARKIV_CHAIN, ARKIV_RPC_URL } from "@/lib/arkiv/chain";
 
 const assertInjectedWallet = () => {
   if (!window.ethereum) {
-    throw new Error("MetaMask is required to use Arkiv on Kaolin.");
+    throw new Error("MetaMask is required to use Arkiv on Braga.");
   }
 
   return window.ethereum;

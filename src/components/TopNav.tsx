@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { LoaderCircle, Wallet, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useArkivStore } from '@/store/useArkivStore'
-import { ARKIV_CHAIN } from '@/lib/arkiv/chain'
+import { ARKIV_CHAIN, ARKIV_DOCS_URL, ARKIV_FAUCET_URL } from '@/lib/arkiv/chain'
 
 const shortAddress = (address?: string) =>
   address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not connected'
@@ -44,14 +44,14 @@ export function TopNav() {
         <div className="flex items-center gap-6">
           <div className="hidden md:flex items-center gap-4 mr-4 font-mono text-xs font-semibold tracking-wide text-gray-700">
             <Link
-              href="https://kaolin.hoodi.arkiv.network/faucet/"
+              href={ARKIV_FAUCET_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center h-8 rounded-lg bg-orange-500 text-white px-4 shadow-md shadow-orange-500/20 hover:bg-orange-600 hover:scale-105 hover:shadow-orange-500/40 active:scale-95 transition-all duration-300"
             >
               Faucet
             </Link>
-            <Link href="https://arkiv.network/dev" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:-translate-y-0.5 transition-all duration-300">
+            <Link href={ARKIV_DOCS_URL} target="_blank" rel="noopener noreferrer" className="hover:text-black hover:-translate-y-0.5 transition-all duration-300">
               Docs
             </Link>
           </div>
@@ -66,7 +66,7 @@ export function TopNav() {
                     : 'bg-[#fce8e6] text-[#c5221f]',
                 ].join(' ')}
               >
-                {onArkivNetwork ? 'Kaolin' : 'Wrong network'}
+                {onArkivNetwork ? 'Braga' : 'Wrong network'}
               </span>
 
               {!onArkivNetwork && (
@@ -86,7 +86,7 @@ export function TopNav() {
             {/* Balance pill */}
             {account && (
               <div className="flex items-center h-10 px-4 rounded-xl border border-gray-200 bg-white shadow-sm font-mono text-sm font-semibold text-gray-700">
-                {balance ? `${Number(balance).toFixed(4)} ETH` : 'Loading...'}
+                {balance ? `${Number(balance).toFixed(4)} GLM` : 'Loading...'}
               </div>
             )}
 

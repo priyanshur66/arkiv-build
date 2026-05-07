@@ -48,16 +48,16 @@ export function ArkivOwnedEntitiesPanel() {
         ) : !account ? (
           <div className="flex items-start gap-3 text-sm text-gray-600">
             <Wallet className="mt-0.5 size-4 text-gray-400" />
-            Connect your wallet to fetch entities already deployed on Arkiv Kaolin.
+            Connect your wallet to fetch entities already deployed on Arkiv Braga.
           </div>
         ) : loadingOwnedEntities ? (
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <LoaderCircle className="size-4 animate-spin" />
-            Loading entities from Kaolin...
+            Loading entities from Braga...
           </div>
         ) : ownedEntities.length === 0 ? (
           <p className="shrink-0 text-sm text-gray-600">
-            No wallet-owned entities were found on Arkiv Kaolin yet.
+            No wallet-owned entities were found on Arkiv Braga yet.
           </p>
         ) : (
           <div className="flex-1 space-y-2 overflow-y-auto px-1 pt-2 pb-2">

@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { Hex } from "viem";
 
-import { isArkivKaolinChain } from "@/lib/arkiv/chain";
+import { isArkivBragaChain } from "@/lib/arkiv/chain";
 import {
   buildCanvasGraphFromSnapshots,
   findConnectedEntityKeys,
@@ -51,6 +51,7 @@ type ArkivState = {
   retryNetworkSwitch: () => Promise<void>;
   refreshBlockTiming: () => Promise<void>;
   refreshBalance: () => Promise<void>;
+  startBalanceSync: () => () => void;
   refreshOwnedEntities: () => Promise<void>;
   loadEntityIntoCanvas: (entityKey: Hex) => Promise<void>;
   deployActiveDraft: () => Promise<void>;
@@ -60,6 +61,10 @@ type ArkivState = {
 };
 
 let unsubscribeWalletEvents: (() => void) | undefined;
+let balanceRefreshPromise: Promise<void> | undefined;
+let balanceSyncStop: (() => void) | undefined;
+
+const BALANCE_SYNC_INTERVAL_MS = 20_000;
 
 export const useArkivStore = create<ArkivState>((set, get) => ({
   initialized: false,
@@ -85,8 +90,8 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       walletAvailable,
       chainId,
       networkNudge:
-        walletAvailable && !isArkivKaolinChain(chainId)
-          ? "Switch MetaMask to the Arkiv Kaolin testnet to browse and deploy entities."
+        walletAvailable && !isArkivBragaChain(chainId)
+          ? "Switch MetaMask to the Arkiv Braga testnet to browse and deploy entities."
           : undefined,
     });
 
@@ -94,7 +99,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       await get().refreshBlockTiming();
     } catch (error) {
       set({
-        error: getErrorMessage(error, "Failed to fetch Kaolin block timing."),
+        error: getErrorMessage(error, "Failed to fetch Braga block timing."),
       });
     }
 
@@ -109,24 +114,27 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     unsubscribeWalletEvents?.();
     unsubscribeWalletEvents = subscribeWalletEvents({
       onAccountsChanged: async (account) => {
-        set({ account });
+        const chainId = await getInjectedChainId();
 
-        if (account && isArkivKaolinChain(await getInjectedChainId())) {
+        set({ account, chainId });
+
+        if (account && isArkivBragaChain(chainId)) {
           await get().refreshBalance();
           await get().refreshOwnedEntities();
         } else {
-          set({ ownedEntities: [] });
+          set({ balance: undefined, ownedEntities: [] });
           useSchemaStore.getState().resetToSingleDraft();
         }
       },
       onChainChanged: async (nextChainId) => {
-        const onCorrectNetwork = isArkivKaolinChain(nextChainId);
+        const onCorrectNetwork = isArkivBragaChain(nextChainId);
 
         set({
           chainId: nextChainId,
+          balance: onCorrectNetwork ? get().balance : undefined,
           networkNudge: onCorrectNetwork
             ? undefined
-            : "MetaMask is connected to the wrong network. Switch to Arkiv Kaolin to continue.",
+            : "MetaMask is connected to the wrong network. Switch to Arkiv Braga to continue.",
         });
 
         if (onCorrectNetwork) {
@@ -143,7 +151,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     const account = await getAuthorizedAccount();
     set({ account });
 
-    if (account && isArkivKaolinChain(chainId)) {
+    if (account && isArkivBragaChain(chainId)) {
       await get().refreshBalance();
       await get().refreshOwnedEntities();
     }
@@ -159,9 +167,9 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
         account,
         chainId,
         walletAvailable: true,
-        networkNudge: isArkivKaolinChain(chainId)
+        networkNudge: isArkivBragaChain(chainId)
           ? undefined
-          : "MetaMask is connected, but not to Arkiv Kaolin yet.",
+          : "MetaMask is connected, but not to Arkiv Braga yet.",
       });
 
       await get().refreshBlockTiming();
@@ -169,7 +177,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       await get().refreshOwnedEntities();
     } catch (error) {
       set({
-        error: getErrorMessage(error, "MetaMask connection to Arkiv Kaolin failed."),
+        error: getErrorMessage(error, "MetaMask connection to Arkiv Braga failed."),
       });
     } finally {
       set({ connecting: false });
@@ -194,7 +202,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       }
     } catch (error) {
       set({
-        error: getErrorMessage(error, "Switching MetaMask to Arkiv Kaolin failed."),
+        error: getErrorMessage(error, "Switching MetaMask to Arkiv Braga failed."),
       });
     }
   },
@@ -203,13 +211,74 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     set({ blockTiming });
   },
   refreshBalance: async () => {
-    const { account } = get();
-    if (!account) {
-      set({ balance: undefined });
-      return;
+    if (balanceRefreshPromise) {
+      return balanceRefreshPromise;
     }
-    const balance = await getAccountBalance(account);
-    set({ balance });
+
+    balanceRefreshPromise = (async () => {
+      const { account, chainId } = get();
+      if (!account) {
+        set({ balance: undefined });
+        return;
+      }
+
+      const injectedChainId = await getInjectedChainId();
+      const activeChainId = injectedChainId ?? chainId;
+
+      if (!isArkivBragaChain(activeChainId)) {
+        set({ chainId: activeChainId, balance: undefined });
+        return;
+      }
+
+      if (activeChainId !== chainId) {
+        set({ chainId: activeChainId });
+      }
+
+      const balance = await getAccountBalance(account);
+      const latestState = get();
+
+      if (latestState.account === account && isArkivBragaChain(latestState.chainId)) {
+        set({ balance });
+      }
+    })().finally(() => {
+      balanceRefreshPromise = undefined;
+    });
+
+    return balanceRefreshPromise;
+  },
+  startBalanceSync: () => {
+    balanceSyncStop?.();
+
+    const refreshIfActive = () => {
+      const { account, chainId } = get();
+
+      if (!account || !isArkivBragaChain(chainId) || document.hidden) {
+        return;
+      }
+
+      void get().refreshBalance();
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshIfActive();
+      }
+    };
+
+    const intervalId = window.setInterval(refreshIfActive, BALANCE_SYNC_INTERVAL_MS);
+
+    window.addEventListener('focus', refreshIfActive);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    refreshIfActive();
+
+    balanceSyncStop = () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', refreshIfActive);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      balanceSyncStop = undefined;
+    };
+
+    return balanceSyncStop;
   },
   refreshOwnedEntities: async () => {
     const { account } = get();
@@ -265,7 +334,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
 
     if (!account) {
       set({
-        error: "Connect MetaMask to Arkiv Kaolin before deploying.",
+        error: "Connect MetaMask to Arkiv Braga before deploying.",
       });
       return;
     }
@@ -286,7 +355,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
 
     if (!account) {
       set({
-        error: 'Connect MetaMask to Arkiv Kaolin before deploying.',
+        error: 'Connect MetaMask to Arkiv Braga before deploying.',
       });
       return;
     }
@@ -312,6 +381,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       schemaStore.setDeployFailed(node.id, false);
       schemaStore.replaceNodeWithPersisted(node.id, snapshot);
       await get().refreshBlockTiming();
+      await get().refreshBalance();
       await get().refreshOwnedEntities();
     } catch (error) {
       schemaStore.setDeployFailed(node.id, true);
@@ -329,7 +399,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
 
     if (!account) {
       set({
-        error: 'Connect MetaMask to Arkiv Kaolin before updating.',
+        error: 'Connect MetaMask to Arkiv Braga before updating.',
       });
       return;
     }
@@ -385,6 +455,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
 
       schemaStore.replaceNodeWithPersisted(activeNode.id, snapshot);
       await get().refreshBlockTiming();
+      await get().refreshBalance();
       await get().refreshOwnedEntities();
     } catch (error) {
       set({

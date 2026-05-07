@@ -3,7 +3,7 @@
 import { CheckCircle, Loader2, RefreshCw, Rocket } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { isArkivKaolinChain } from '@/lib/arkiv/chain'
+import { isArkivBragaChain } from '@/lib/arkiv/chain'
 import { useArkivStore } from '@/store/useArkivStore'
 import type { EntityNodeData } from '@/store/useSchemaStore'
 
@@ -44,7 +44,7 @@ export function EntityActions({
           disabled={
             !walletAvailable ||
             !account ||
-            !isArkivKaolinChain(chainId) ||
+            !isArkivBragaChain(chainId) ||
             deploying ||
             hasPendingParent
           }
@@ -68,12 +68,12 @@ export function EntityActions({
           ) : data.deployFailed ? (
             <>
               <Rocket className="mr-3 size-4" />
-              Redeploy to Arkiv Kaolin
+              Redeploy to Arkiv Braga
             </>
           ) : (
             <>
               <Rocket className="mr-3 size-4" />
-              Deploy to Arkiv Kaolin
+              Deploy to Arkiv Braga
             </>
           )}
         </Button>

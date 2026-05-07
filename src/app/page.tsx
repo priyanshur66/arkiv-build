@@ -45,6 +45,7 @@ function SchemaCanvas() {
   const setActiveNode = useSchemaStore((state) => state.setActiveNode);
   const clearCanvas = useSchemaStore((state) => state.clearCanvas);
   const initializeArkiv = useArkivStore((state) => state.initialize);
+  const startBalanceSync = useArkivStore((state) => state.startBalanceSync);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
   const { setCenter, getNodes } = useReactFlow();
@@ -95,7 +96,8 @@ function SchemaCanvas() {
 
   useEffect(() => {
     void initializeArkiv();
-  }, [initializeArkiv]);
+    return startBalanceSync();
+  }, [initializeArkiv, startBalanceSync]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#fafafa]">
