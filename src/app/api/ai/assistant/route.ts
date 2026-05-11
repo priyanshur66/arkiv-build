@@ -1,7 +1,10 @@
 import {
-  ARKIV_BUILD_AGENT_SYSTEM_PROMPT,
+  buildAssistantSystemPrompt,
+  DISCUSSION_JSON_REPAIR_SYSTEM_PROMPT,
   buildAssistantDiscussionUserPrompt,
-} from '@/lib/ai/assistantPrompts'
+  buildImplementationPlanUserPrompt,
+  buildImplementationPlanSystemPrompt,
+} from '@/lib/prompts'
 import type {
   AssistantApiRequest,
   AssistantMessage,
@@ -20,10 +23,7 @@ import {
   type ChatCompletionResponse,
 } from '@/lib/ai/chatCompletions'
 import { generateDataModelFromAi } from '@/lib/ai/dataModelGeneration'
-import {
-  IMPLEMENTATION_PLAN_SYSTEM_PROMPT,
-  buildImplementationPlanUserPrompt,
-} from '@/lib/ai/implementationPlanPrompts'
+import { getSkillContextResult } from '@/lib/ai/skillContext'
 import { getErrorMessage } from '@/lib/errors'
 
 const MAX_MESSAGES = 12
@@ -75,16 +75,6 @@ const DISCUSSION_JSON_SCHEMA = {
     required: ['messageMarkdown', 'questions', 'readyToBuild'],
   },
 } as const
-
-const DISCUSSION_JSON_REPAIR_SYSTEM_PROMPT = `Convert the provided content into valid JSON that matches the requested discussion response schema.
-
-Rules:
-- Return JSON only.
-- No markdown fences.
-- Preserve the assistant's intent and tone from the source message.
-- Keep messageMarkdown user-visible and concise.
-- Keep questions actionable and option-friendly.
-- Ensure readyToBuild is false whenever questions is non-empty.`
 
 type StructuredDiscussionEnvelope = {
   messageMarkdown: string
@@ -297,6 +287,7 @@ const postStructuredDiscussionCompletion = async ({
   endpointUrl,
   apiKey,
   model,
+  systemPrompt,
   messages,
   useCase,
   projectAttributeWalletPrefix,
@@ -305,6 +296,7 @@ const postStructuredDiscussionCompletion = async ({
   endpointUrl: string
   apiKey: string
   model: string
+  systemPrompt: string
   messages: AssistantMessage[]
   useCase: string
   projectAttributeWalletPrefix?: string
@@ -326,7 +318,7 @@ const postStructuredDiscussionCompletion = async ({
     messages: [
       {
         role: 'system',
-        content: ARKIV_BUILD_AGENT_SYSTEM_PROMPT,
+        content: systemPrompt,
       },
       {
         role: 'user',
@@ -542,6 +534,19 @@ export async function POST(request: Request) {
   }
 
   try {
+    let skillContext = ''
+
+    if (mode !== 'generateSchema') {
+      const skillContextResult = await getSkillContextResult()
+      skillContext = skillContextResult.context
+
+      console.info('[ai:assistant] skill context loaded', {
+        requestId,
+        source: skillContextResult.source,
+        contextLength: skillContext.length,
+      })
+    }
+
     if (mode === 'generateSchema') {
       const { dataModel, generationTrace } = await generateDataModelFromAi({
         endpointUrl,
@@ -566,7 +571,7 @@ export async function POST(request: Request) {
         endpointUrl,
         apiKey,
         model,
-        systemPrompt: IMPLEMENTATION_PLAN_SYSTEM_PROMPT,
+        systemPrompt: buildImplementationPlanSystemPrompt(skillContext),
         userPrompt: buildImplementationPlanUserPrompt({
           messages,
           useCase,
@@ -587,6 +592,7 @@ export async function POST(request: Request) {
       endpointUrl,
       apiKey,
       model,
+      systemPrompt: buildAssistantSystemPrompt(skillContext),
       messages,
       useCase,
       projectAttributeWalletPrefix: connectedWalletAddress,

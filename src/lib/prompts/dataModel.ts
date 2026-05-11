@@ -1,3 +1,5 @@
+import 'server-only'
+
 import type { DataModelGenerationMode, GeneratedDataModel } from '@/lib/ai/dataModel'
 
 export const SYSTEM_PROMPT = `# ROLE AND DIRECTIVE

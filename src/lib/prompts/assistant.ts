@@ -1,13 +1,8 @@
-import {
-  formatArkivFitForPrompt,
-  formatBestPracticesForPrompt,
-  formatExamplePatternsForPrompt,
-  formatNetworkContext,
-  formatPrivacyContext,
-} from '@/lib/ai/arkivContext'
+import 'server-only'
+
 import type { AssistantMessage } from '@/lib/ai/assistantTypes'
 
-export const ARKIV_BUILD_AGENT_SYSTEM_PROMPT = `You are Arkiv Build Agent, an Arkiv-native product and data architect inside Arkiv Build.
+export const buildAssistantSystemPrompt = (skillContext: string) => `You are Arkiv Build Agent, an Arkiv-native product and data architect inside Arkiv Build.
 
 Use the names Arkiv Build Agent or AI assistant for this workflow.
 
@@ -128,20 +123,22 @@ AUTO-BUILD PROTOCOL — how to trigger schema generation:
 
 Do NOT use section headers like "INITIAL SHAPE", "NEXT STEP", "NEXT DECISIONS TO MAKE", "STARTING SCHEMA", or similar all-caps labels. Keep replies conversational.
 
-${formatNetworkContext()}
-
-${formatPrivacyContext()}
+Reference this Arkiv skill context when relevant:
+${skillContext}
 
 CRITICAL: Whenever the user mentions privacy, private data, confidential, secret, hidden, restricted, sensitive, encryption, leaks, "who can see", or anything implying access control, you MUST include an explicit note in your response that data stored on Arkiv is visible on the Arkiv explorer and to network indexers unless it is encrypted client-side before being written. Do not let the user assume that ownership scoping or createdBy/ownedBy filters provide storage-level secrecy.
 
-Arkiv best practices to weave in when relevant:
-${formatBestPracticesForPrompt()}
+`
 
-Explain Arkiv fit against alternatives when useful:
-${formatArkivFitForPrompt()}
+export const DISCUSSION_JSON_REPAIR_SYSTEM_PROMPT = `Convert the provided content into valid JSON that matches the requested discussion response schema.
 
-Reference example patterns when they fit the user's idea:
-${formatExamplePatternsForPrompt()}`
+Rules:
+- Return JSON only.
+- No markdown fences.
+- Preserve the assistant's intent and tone from the source message.
+- Keep messageMarkdown user-visible and concise.
+- Keep questions actionable and option-friendly.
+- Ensure readyToBuild is false whenever questions is non-empty.`
 
 export const buildAssistantDiscussionUserPrompt = ({
   messages,
@@ -155,6 +152,7 @@ export const buildAssistantDiscussionUserPrompt = ({
   const hasPriorAssistantReply = messages.some(
     (message) => message.role === 'assistant',
   )
+  // TODO: remove add arkiv skill info here so agent can reason better about the use case
 
   return [
     'Continue this Arkiv Build Agent conversation.',
@@ -163,7 +161,7 @@ export const buildAssistantDiscussionUserPrompt = ({
       : '',
     hasPriorAssistantReply
       ? 'Turn type: follow-up. Assume Arkiv fit is already established. Do not re-explain generic Arkiv advantages unless the user explicitly asks or the architecture direction changes.'
-      : 'Turn type: first response for a new idea. Include a short explicit "why Arkiv" framing.',
+      : 'Turn type: first response for a new idea. Include a short explicit "How Arkiv is a better db for the use case" framing.',
     `Current user message:\n${useCase}`,
     messages.length > 0
       ? `Conversation so far:\n${messages
@@ -173,6 +171,7 @@ export const buildAssistantDiscussionUserPrompt = ({
     'Return only valid JSON using this exact top-level shape:',
     '{"messageMarkdown":"string","questions":[{"id":"string","prompt":"string","options":["string"]}],"readyToBuild":false}',
     'No markdown fences. No extra keys. Keep user-visible prose inside messageMarkdown only.',
+
   ]
     .filter(Boolean)
     .join('\n\n')

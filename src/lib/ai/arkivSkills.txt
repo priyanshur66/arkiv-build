@@ -1,0 +1,1528 @@
+└── skills/ (11800 tokens)
+    └── arkiv-best-practices/ (11800 tokens)
+        ├── references/ (7300 tokens)
+            ├── migration-guide.md (1000 tokens)
+            ├── advanced-patterns.md (1100 tokens)
+            ├── api-reference.md (1400 tokens)
+            ├── sdk-reference.md (1600 tokens)
+            └── integration-patterns.md (2200 tokens)
+        └── SKILL.md (4500 tokens)
+
+
+/skills/arkiv-best-practices/references/migration-guide.md:
+--------------------------------------------------------------------------------
+  1 | # Kaolin to Braga Migration Guide
+  2 | 
+  3 | Use this guide when the user already has an Arkiv project that targets Kaolin and needs to move it to Braga.
+  4 | 
+  5 | ## What Changes
+  6 | 
+  7 | - The SDK API stays the same.
+  8 | - The `braga` chain export requires `@arkiv-network/sdk` version `0.6.5` or higher.
+  9 | - The chain target changes from `kaolin` to `braga`.
+ 10 | - The active RPC, WebSocket, faucet, explorer, and chain ID all change.
+ 11 | - Braga uses `GLM` as the native gas token instead of test ETH.
+ 12 | - Testnet state does not migrate: entities written to Kaolin stay on Kaolin.
+ 13 | 
+ 14 | ## Sunset Window
+ 15 | 
+ 16 | - Kaolin and Braga can run in parallel until `15 May 2026`.
+ 17 | - After that date, Kaolin endpoints stop responding.
+ 18 | 
+ 19 | ## Migration Checklist
+ 20 | 
+ 21 | ### 1. Update SDK chain imports
+ 22 | 
+ 23 | Before changing imports, verify that the project is already on `@arkiv-network/sdk` `0.6.5` or newer. Do not pin a replacement install command by default; tell the user to check the current SDK version and upgrade only if the project is below the minimum needed for `braga`.
+ 24 | 
+ 25 | ```diff
+ 26 | - import { kaolin } from "@arkiv-network/sdk/chains";
+ 27 | + import { braga } from "@arkiv-network/sdk/chains";
+ 28 | 
+ 29 |   const client = createClient({
+ 30 | -   chain: kaolin,
+ 31 | +   chain: braga,
+ 32 |     account,
+ 33 |   });
+ 34 | ```
+ 35 | 
+ 36 | Apply the same swap for `createWalletClient`, `createPublicClient`, wagmi-derived Arkiv clients, and any custom chain constants that still point to Kaolin.
+ 37 | 
+ 38 | ### 2. Replace network constants and wallet settings
+ 39 | 
+ 40 | Use these Braga values everywhere the project configures the network:
+ 41 | 
+ 42 | | Property | Braga value |
+ 43 | | -------- | ----------- |
+ 44 | | Chain ID | `60138453102` / `0xe0087f86e` |
+ 45 | | HTTP RPC | `https://braga.hoodi.arkiv.network/rpc` |
+ 46 | | WebSocket RPC | `wss://braga.hoodi.arkiv.network/rpc/ws` |
+ 47 | | Explorer | `https://explorer.braga.hoodi.arkiv.network` |
+ 48 | | Faucet | `https://braga.hoodi.arkiv.network/faucet/` |
+ 49 | | Native gas token | `GLM` |
+ 50 | 
+ 51 | If the project adds the network to MetaMask or viem manually, update:
+ 52 | 
+ 53 | - `chainId`
+ 54 | - `chainName`
+ 55 | - `rpcUrls`
+ 56 | - `blockExplorers`
+ 57 | - `nativeCurrency` so the symbol is `GLM`
+ 58 | 
+ 59 | ### 3. Rename env vars and config keys
+ 60 | 
+ 61 | Do not leave mixed Kaolin and Braga names in active codepaths. Rename env vars so the environment clearly reflects the current target network:
+ 62 | 
+ 63 | ```diff
+ 64 | - KAOLIN_RPC_URL=https://kaolin.hoodi.arkiv.network/rpc
+ 65 | + BRAGA_RPC_URL=https://braga.hoodi.arkiv.network/rpc
+ 66 | ```
+ 67 | 
+ 68 | Check these places for stale Kaolin references:
+ 69 | 
+ 70 | - `.env*` files
+ 71 | - deployment configs
+ 72 | - Docker or container env wiring
+ 73 | - shell scripts and seed scripts
+ 74 | - README setup steps
+ 75 | - frontend wallet config
+ 76 | 
+ 77 | ### 4. Refresh funding and bridge configuration
+ 78 | 
+ 79 | - Request fresh test `GLM` from the Braga faucet.
+ 80 | - If the app bridges programmatically, update the Standard Bridge address to `0xB52b417A79c9dE21ffe221dF9a3821B7EaC60813`.
+ 81 | - Funds already bridged into Kaolin stay there; withdraw them before the sunset if needed.
+ 82 | 
+ 83 | ### 5. Re-create entities and seed data
+ 84 | 
+ 85 | Kaolin entities do not migrate to Braga. If the app depends on seed data, startup entities, cached indexes, or demo content, run the seed/migration script against Braga before switching traffic.
+ 86 | 
+ 87 | Pay special attention to:
+ 88 | 
+ 89 | - entities loaded at app startup
+ 90 | - admin-created demo data
+ 91 | - test fixtures used by integration tests
+ 92 | - dashboards that assume existing rows are already present
+ 93 | 
+ 94 | ### 6. Verify both read and write paths
+ 95 | 
+ 96 | After updating the network target:
+ 97 | 
+ 98 | - run one write flow end-to-end
+ 99 | - verify queries return the newly written entity
+100 | - confirm wallet prompts show Braga, not Kaolin
+101 | - confirm gas is charged in `GLM`
+102 | 
+103 | ## Migration Notes for Agents
+104 | 
+105 | - Prefer narrow replacements: change active codepaths to Braga, then remove or isolate Kaolin-only compatibility code.
+106 | - Keep Kaolin references only in migration docs, temporary fallback configs, or explicit legacy support blocks.
+107 | - If the codebase uses direct viem or wagmi chain definitions instead of the Arkiv exported chain, update `id`, `rpcUrls`, `blockExplorers`, and `nativeCurrency` consistently.
+108 | - If an app must run both networks during the overlap period, keep the network selection explicit and label data sources clearly to avoid mixing Kaolin and Braga entities.
+109 | 
+
+
+--------------------------------------------------------------------------------
+/skills/arkiv-best-practices/references/advanced-patterns.md:
+--------------------------------------------------------------------------------
+  1 | # Advanced Data Modeling Patterns
+  2 | 
+  3 | Patterns for handling type safety and complex relationships in Arkiv.
+  4 | 
+  5 | ## Table of Contents
+  6 | 
+  7 | 1. [Validate Entity Data with a Schema Library](#validate-entity-data-with-a-schema-library)
+  8 | 2. [Model Lists with Relationship Entities](#model-lists-with-relationship-entities)
+  9 | 
+ 10 | ---
+ 11 | 
+ 12 | ## Validate Entity Data with a Schema Library
+ 13 | 
+ 14 | `entity.toJson()` returns `any` in TypeScript — no type safety. Always validate the shape of data you read from Arkiv using a schema validation library (e.g., `zod`, `valibot`, `yup`). Before adding a new library, check if the project already uses one.
+ 15 | 
+ 16 | ```typescript
+ 17 | import { z } from "zod"; // or use whatever validation library the project already has
+ 18 | 
+ 19 | const PostSchema = z.object({
+ 20 |   title: z.string(),
+ 21 |   content: z.string(),
+ 22 |   author: z.string().optional(),
+ 23 | });
+ 24 | 
+ 25 | type Post = z.infer<typeof PostSchema>;
+ 26 | 
+ 27 | // Safe parsing — never trust raw entity data
+ 28 | function parsePost(entity: any): Post {
+ 29 |   const raw = entity.toJson();
+ 30 |   const result = PostSchema.safeParse(raw);
+ 31 |   if (!result.success) {
+ 32 |     console.error("Invalid entity data:", result.error.flatten());
+ 33 |     throw new Error("Entity data does not match expected schema");
+ 34 |   }
+ 35 |   return result.data;
+ 36 | }
+ 37 | 
+ 38 | // Usage in queries
+ 39 | const result = await publicClient
+ 40 |   .buildQuery()
+ 41 |   .where([
+ 42 |     eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+ 43 |     eq("entityType", "post"),
+ 44 |   ])
+ 45 |   .withPayload(true)
+ 46 |   .fetch();
+ 47 | 
+ 48 | const posts: Post[] = result.entities
+ 49 |   .map((e) => {
+ 50 |     try {
+ 51 |       return parsePost(e);
+ 52 |     } catch {
+ 53 |       return null;
+ 54 |     }
+ 55 |   })
+ 56 |   .filter((p): p is Post => p !== null);
+ 57 | ```
+ 58 | 
+ 59 | This protects against:
+ 60 | 
+ 61 | - Other projects accidentally writing to your attribute namespace
+ 62 | - Data format changes between versions
+ 63 | - Corrupted or malformed payloads
+ 64 | 
+ 65 | ---
+ 66 | 
+ 67 | ## Model Lists with Relationship Entities
+ 68 | 
+ 69 | Arkiv attributes are flat key-value pairs — there is no native array type. A common mistake is trying to encode lists into attributes:
+ 70 | 
+ 71 | ```typescript
+ 72 | // BAD — indexed attributes. Can't query "all profiles with skill frontend"
+ 73 | attributes: [
+ 74 |   { key: "skills_0", value: "frontend" },
+ 75 |   { key: "skills_1", value: "backend" },
+ 76 |   { key: "skills_2", value: "devops" },
+ 77 | ]
+ 78 | 
+ 79 | // BAD — comma-separated string. Can't query individual skills
+ 80 | attributes: [
+ 81 |   { key: "skills", value: "frontend, backend, devops" },
+ 82 | ]
+ 83 | ```
+ 84 | 
+ 85 | Both approaches break querying. You can't efficiently find "all profiles that have the `frontend` skill" without fetching everything and filtering client-side.
+ 86 | 
+ 87 | **The correct pattern:** Create separate **relationship entities** that link the parent entity to each value. This is the relational model — one entity per relationship:
+ 88 | 
+ 89 | ```typescript
+ 90 | // 1. Create the profile entity
+ 91 | const { entityKey: profileKey } = await walletClient.createEntity({
+ 92 |   payload: jsonToPayload({ name: "Alice", bio: "Full-stack dev" }),
+ 93 |   contentType: "application/json",
+ 94 |   attributes: [
+ 95 |     PROJECT_ATTRIBUTE,
+ 96 |     { key: "entityType", value: "profile" },
+ 97 |     { key: "profileId", value: "alice-123" },
+ 98 |   ],
+ 99 |   expiresIn: ExpirationTime.fromDays(30),
+100 | });
+101 | 
+102 | // 2. Create one relationship entity per skill
+103 | const skills = ["frontend", "backend", "devops"];
+104 | await walletClient.mutateEntities({
+105 |   creates: skills.map((skill) => ({
+106 |     payload: jsonToPayload({ profileId: "alice-123", skill }),
+107 |     contentType: "application/json",
+108 |     attributes: [
+109 |       PROJECT_ATTRIBUTE,
+110 |       { key: "entityType", value: "profileSkill" },
+111 |       { key: "profileId", value: "alice-123" },
+112 |       { key: "skill", value: skill },
+113 |     ],
+114 |     expiresIn: ExpirationTime.fromDays(30),
+115 |   })),
+116 | });
+117 | 
+118 | // 3. Query all profiles with "frontend" skill — fast and indexed
+119 | const frontendDevs = await publicClient.buildQuery()
+120 |   .where([
+121 |     eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+122 |     eq("entityType", "profileSkill"),
+123 |     eq("skill", "frontend"),
+124 |   ])
+125 |   .withPayload(true)
+126 |   .fetch();
+127 | 
+128 | // 4. Query all skills for a specific profile
+129 | const aliceSkills = await publicClient.buildQuery()
+130 |   .where([
+131 |     eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+132 |     eq("entityType", "profileSkill"),
+133 |     eq("profileId", "alice-123"),
+134 |   ])
+135 |   .withPayload(true)
+136 |   .fetch();
+137 | ```
+138 | 
+139 | This pattern applies to any one-to-many or many-to-many relationship: tags, categories, permissions, memberships, etc.
+140 | 
+
+
+--------------------------------------------------------------------------------
+/skills/arkiv-best-practices/references/api-reference.md:
+--------------------------------------------------------------------------------
+  1 | # Arkiv JSON-RPC API Reference
+  2 | 
+  3 | Arkiv exposes a JSON-RPC 2.0 API over HTTP. Use this when you need raw HTTP access without the SDK, or for advanced query options.
+  4 | 
+  5 | ## Endpoint
+  6 | 
+  7 | | Property  | Value                                         |
+  8 | | --------- | --------------------------------------------- |
+  9 | | Chain ID  | `60138453102`                                 |
+ 10 | | HTTP RPC  | `https://braga.hoodi.arkiv.network/rpc`       |
+ 11 | | WebSocket | `wss://braga.hoodi.arkiv.network/rpc/ws`      |
+ 12 | | Explorer  | `https://explorer.braga.hoodi.arkiv.network`  |
+ 13 | | Faucet    | `https://braga.hoodi.arkiv.network/faucet`    |
+ 14 | 
+ 15 | ## Request Format
+ 16 | 
+ 17 | All methods use standard JSON-RPC 2.0.
+ 18 | 
+ 19 | ```bash
+ 20 | curl https://braga.hoodi.arkiv.network/rpc \
+ 21 |   -H "content-type: application/json" \
+ 22 |   -d '{"jsonrpc":"2.0","id":1,"method":"METHOD_NAME","params":[]}'
+ 23 | ```
+ 24 | 
+ 25 | ## Methods
+ 26 | 
+ 27 | ### arkiv_query
+ 28 | 
+ 29 | Query entities from the bitmap-backed SQLite store.
+ 30 | 
+ 31 | **Parameters:**
+ 32 | 
+ 33 | | Index | Type        | Required | Description      |
+ 34 | | ----- | ----------- | -------- | ---------------- |
+ 35 | | 0     | string      | Yes      | Query expression |
+ 36 | | 1     | object/null | No       | Query options    |
+ 37 | 
+ 38 | **Query Syntax — Operators:**
+ 39 | 
+ 40 | - Logical: `&&`, `||`
+ 41 | - Negation: `!`
+ 42 | - Comparisons: `=`, `!=`, `<`, `>`, `<=`, `>=`
+ 43 | - Glob matching: `~` (match), `!~` (negated match)
+ 44 | 
+ 45 | **Synthetic Attributes (use with `$` prefix):**
+ 46 | 
+ 47 | - `$owner` — Entity owner address
+ 48 | - `$creator` — Entity creator address
+ 49 | - `$key` — Entity key
+ 50 | - `$expiration` — Expiration block
+ 51 | - `$createdAtBlock` — Block at creation
+ 52 | - `$sequence`, `$txIndex`, `$opIndex` — Ordering attributes
+ 53 | - `$all` — Match all entities
+ 54 | 
+ 55 | **Options:**
+ 56 | 
+ 57 | | Field          | Type       | Description                               |
+ 58 | | -------------- | ---------- | ----------------------------------------- |
+ 59 | | atBlock        | hex string | Query at specific block (e.g., `"0x1bc"`) |
+ 60 | | includeData    | object     | Controls which fields are returned        |
+ 61 | | resultsPerPage | hex string | Page size, max 200                        |
+ 62 | | cursor         | string     | Pagination cursor from previous response  |
+ 63 | 
+ 64 | **includeData defaults (all true when omitted):**
+ 65 | 
+ 66 | - key, contentType, payload, creator, owner, attributes, expiration
+ 67 | 
+ 68 | **Example — query active NFTs:**
+ 69 | 
+ 70 | ```bash
+ 71 | curl https://braga.hoodi.arkiv.network/rpc \
+ 72 |   -H "content-type: application/json" \
+ 73 |   -d '{
+ 74 |     "jsonrpc":"2.0","id":1,
+ 75 |     "method":"arkiv_query",
+ 76 |     "params":[
+ 77 |       "type = \"nft\" && status = \"active\"",
+ 78 |       {"resultsPerPage":"0xa"}
+ 79 |     ]
+ 80 |   }'
+ 81 | ```
+ 82 | 
+ 83 | **Example — query by owner:**
+ 84 | 
+ 85 | ```bash
+ 86 | curl https://braga.hoodi.arkiv.network/rpc \
+ 87 |   -H "content-type: application/json" \
+ 88 |   -d '{
+ 89 |     "jsonrpc":"2.0","id":10,
+ 90 |     "method":"arkiv_query",
+ 91 |     "params":[
+ 92 |       "$owner = \"0x2222222222222222222222222222222222222222\"",
+ 93 |       null
+ 94 |     ]
+ 95 |   }'
+ 96 | ```
+ 97 | 
+ 98 | **Example — numeric range:**
+ 99 | 
+100 | ```bash
+101 | curl https://braga.hoodi.arkiv.network/rpc \
+102 |   -H "content-type: application/json" \
+103 |   -d '{
+104 |     "jsonrpc":"2.0","id":12,
+105 |     "method":"arkiv_query",
+106 |     "params":["price >= 100 && price <= 1000", null]
+107 |   }'
+108 | ```
+109 | 
+110 | **Example — glob match with negation:**
+111 | 
+112 | ```bash
+113 | curl https://braga.hoodi.arkiv.network/rpc \
+114 |   -H "content-type: application/json" \
+115 |   -d '{
+116 |     "jsonrpc":"2.0","id":13,
+117 |     "method":"arkiv_query",
+118 |     "params":["name ~ \"test*\" && !(status = \"deleted\")", null]
+119 |   }'
+120 | ```
+121 | 
+122 | **Example — metadata only (omit payload):**
+123 | 
+124 | ```bash
+125 | curl https://braga.hoodi.arkiv.network/rpc \
+126 |   -H "content-type: application/json" \
+127 |   -d '{
+128 |     "jsonrpc":"2.0","id":14,
+129 |     "method":"arkiv_query",
+130 |     "params":[
+131 |       "$all",
+132 |       {
+133 |         "resultsPerPage":"0xa",
+134 |         "includeData":{
+135 |           "key":true,"attributes":true,"payload":false,
+136 |           "contentType":true,"expiration":true,
+137 |           "creator":true,"owner":true
+138 |         }
+139 |       }
+140 |     ]
+141 |   }'
+142 | ```
+143 | 
+144 | **Response structure:**
+145 | 
+146 | ```json
+147 | {
+148 |   "jsonrpc": "2.0",
+149 |   "id": 1,
+150 |   "result": {
+151 |     "data": [
+152 |       {
+153 |         "key": "0x...",
+154 |         "value": "0x...",
+155 |         "contentType": "application/json",
+156 |         "expiresAt": 1200000,
+157 |         "creator": "0x...",
+158 |         "owner": "0x...",
+159 |         "createdAtBlock": 401,
+160 |         "lastModifiedAtBlock": 443,
+161 |         "stringAttributes": [{ "key": "status", "value": "active" }],
+162 |         "numericAttributes": [{ "key": "rarity", "value": 5 }]
+163 |       }
+164 |     ],
+165 |     "blockNumber": "0x1bc",
+166 |     "cursor": "0x2a"
+167 |   }
+168 | }
+169 | ```
+170 | 
+171 | **Notes:**
+172 | 
+173 | - `value` is hex-encoded bytes (decode to get payload)
+174 | - `cursor` is omitted when no more pages remain
+175 | - `blockNumber` is a hex string
+176 | 
+177 | **Pagination:**
+178 | Use the returned `cursor` in the next request:
+179 | 
+180 | ```json
+181 | {"method":"arkiv_query","params":["type = \"nft\"",{"cursor":"0x2a","resultsPerPage":"0x2"}]}
+182 | ```
+183 | 
+184 | ### arkiv_getEntityCount
+185 | 
+186 | Returns total number of entities currently stored. No parameters.
+187 | 
+188 | ```bash
+189 | curl https://braga.hoodi.arkiv.network/rpc \
+190 |   -H "content-type: application/json" \
+191 |   -d '{"jsonrpc":"2.0","id":3,"method":"arkiv_getEntityCount","params":[]}'
+192 | ```
+193 | 
+194 | Result: plain JSON number (e.g., `18427`).
+195 | 
+196 | ### arkiv_getNumberOfUsedSlots
+197 | 
+198 | Returns used storage-accounting slots. No parameters. Result is a hex string.
+199 | 
+200 | ### arkiv_getBlockTiming
+201 | 
+202 | Returns timing for the current head block. No parameters.
+203 | 
+204 | Response:
+205 | 
+206 | ```json
+207 | {
+208 |   "result": {
+209 |     "current_block": 582143,
+210 |     "current_block_time": 1742721127,
+211 |     "duration": 2
+212 |   }
+213 | }
+214 | ```
+215 | 
+216 | - `current_block_time` — Unix timestamp in seconds
+217 | - `duration` — seconds since previous block
+218 | 
+
+
+--------------------------------------------------------------------------------
+/skills/arkiv-best-practices/references/sdk-reference.md:
+--------------------------------------------------------------------------------
+  1 | # Arkiv SDK Reference
+  2 | 
+  3 | ## TypeScript SDK
+  4 | 
+  5 | ### Installation
+  6 | 
+  7 | ```bash
+  8 | # npm
+  9 | npm install @arkiv-network/sdk
+ 10 | 
+ 11 | # Bun
+ 12 | bun add @arkiv-network/sdk
+ 13 | ```
+ 14 | 
+ 15 | The `braga` chain export is available in `@arkiv-network/sdk` version `0.6.5` or higher. Before suggesting `import { braga } from "@arkiv-network/sdk/chains"`, verify the user's installed SDK version meets that minimum. Do not pin install commands unless the user explicitly asks for a specific version.
+ 16 | 
+ 17 | ### Imports
+ 18 | 
+ 19 | ```typescript
+ 20 | // Core client factories
+ 21 | import { createWalletClient, createPublicClient, http, custom } from "@arkiv-network/sdk"
+ 22 | 
+ 23 | // Account management
+ 24 | import { privateKeyToAccount } from "@arkiv-network/sdk/accounts"
+ 25 | 
+ 26 | // Chain configuration
+ 27 | import { braga } from "@arkiv-network/sdk/chains"
+ 28 | 
+ 29 | // Utilities
+ 30 | import { ExpirationTime, jsonToPayload, stringToPayload, payloadToString } from "@arkiv-network/sdk/utils"
+ 31 | 
+ 32 | // Query operators
+ 33 | import { eq, gt, lt, gte, lte, and } from "@arkiv-network/sdk/query"
+ 34 | ```
+ 35 | 
+ 36 | ### WalletClient Methods (Write Operations)
+ 37 | 
+ 38 | #### createEntity
+ 39 | 
+ 40 | ```typescript
+ 41 | const { entityKey, txHash } = await walletClient.createEntity({
+ 42 |   payload: jsonToPayload({ message: 'Hello' }),
+ 43 |   contentType: 'application/json',
+ 44 |   attributes: [
+ 45 |     { key: 'type', value: 'greeting' },
+ 46 |     { key: 'priority', value: 5 }
+ 47 |   ],
+ 48 |   expiresIn: ExpirationTime.fromHours(12),
+ 49 | })
+ 50 | ```
+ 51 | 
+ 52 | #### updateEntity
+ 53 | 
+ 54 | ```typescript
+ 55 | const { txHash } = await walletClient.updateEntity({
+ 56 |   entityKey: entityKey,
+ 57 |   payload: jsonToPayload({ message: 'Updated' }),
+ 58 |   contentType: 'application/json',
+ 59 |   attributes: [
+ 60 |     { key: 'type', value: 'greeting' },
+ 61 |     { key: 'updated', value: Date.now() }
+ 62 |   ],
+ 63 |   expiresIn: ExpirationTime.fromHours(24),
+ 64 | })
+ 65 | ```
+ 66 | 
+ 67 | #### deleteEntity
+ 68 | 
+ 69 | ```typescript
+ 70 | const { txHash } = await walletClient.deleteEntity({
+ 71 |   entityKey: entityKey
+ 72 | })
+ 73 | ```
+ 74 | 
+ 75 | #### extendEntity
+ 76 | 
+ 77 | ```typescript
+ 78 | const { txHash } = await walletClient.extendEntity({
+ 79 |   entityKey: entityKey,
+ 80 |   expiresIn: ExpirationTime.fromHours(1), // always use the helper for readability
+ 81 | })
+ 82 | ```
+ 83 | 
+ 84 | #### mutateEntities (Batch Operations)
+ 85 | 
+ 86 | ```typescript
+ 87 | await walletClient.mutateEntities({
+ 88 |   creates: [
+ 89 |     {
+ 90 |       payload: stringToPayload('item 1'),
+ 91 |       contentType: 'text/plain',
+ 92 |       attributes: [{ key: 'type', value: 'item' }],
+ 93 |       expiresIn: ExpirationTime.fromMinutes(30),
+ 94 |     },
+ 95 |     {
+ 96 |       payload: stringToPayload('item 2'),
+ 97 |       contentType: 'text/plain',
+ 98 |       attributes: [{ key: 'type', value: 'item' }],
+ 99 |       expiresIn: ExpirationTime.fromMinutes(30),
+100 |     }
+101 |   ]
+102 | })
+103 | ```
+104 | 
+105 | ### PublicClient Methods (Read Operations)
+106 | 
+107 | #### buildQuery + fetch
+108 | 
+109 | ```typescript
+110 | const query = publicClient.buildQuery()
+111 | const results = await query
+112 |   .where(eq('type', 'note'))
+113 |   .where(gt('created', 1672531200))
+114 |   .withPayload(true)
+115 |   .withAttributes(true)
+116 |   .fetch()
+117 | ```
+118 | 
+119 | Query builder methods:
+120 | 
+121 | - `.where(condition)` — Add a filter condition (can chain multiple)
+122 | - `.withPayload(true)` — Include entity payload in results
+123 | - `.withAttributes(true)` — Include attributes in results
+124 | - `.withMetadata(true)` — Include metadata like ownership and TTL in the results
+125 | - `.ownedBy(address)` — Filter by current owner address (can change over time)
+126 | - `.createdBy(address)` — Filter by original creator address (immutable)
+127 | - `.fetch()` — Execute the query
+128 | 
+129 | #### getEntity
+130 | 
+131 | ```typescript
+132 | const entity = await publicClient.getEntity(entityKey)
+133 | const data = entity.toJson()   // Parse JSON payload
+134 | const text = entity.toText()   // Get text payload
+135 | ```
+136 | 
+137 | ### ExpirationTime Helpers
+138 | 
+139 | Expiration is expressed in **seconds**. Always use these helpers to convert human-readable durations:
+140 | 
+141 | ```typescript
+142 | ExpirationTime.fromMinutes(30)  // 1800 seconds
+143 | ExpirationTime.fromHours(1)     // 3600 seconds
+144 | ExpirationTime.fromHours(12)    // 43200 seconds
+145 | ExpirationTime.fromHours(24)    // 86400 seconds
+146 | ExpirationTime.fromDays(7)      // 604800 seconds
+147 | ```
+148 | 
+149 | **Always prefer the helpers over raw numbers for `expiresIn`** — they're more readable and less error-prone. If a raw number is passed, it is treated as seconds (e.g., `expiresIn: 3600` means 1 hour).
+150 | 
+151 | ### Payload Helpers
+152 | 
+153 | ```typescript
+154 | import { jsonToPayload, stringToPayload, payloadToString } from "@arkiv-network/sdk/utils"
+155 | 
+156 | // JSON data
+157 | const jsonPayload = jsonToPayload({ key: "value" })
+158 | 
+159 | // Plain text
+160 | const textPayload = stringToPayload("Hello Arkiv!")
+161 | 
+162 | // Reading back
+163 | const text = payloadToString(entity.payload)
+164 | const data = JSON.parse(payloadToString(entity.payload))
+165 | // or use entity helper
+166 | const data = entity.toJson()
+167 | ```
+168 | 
+169 | ### Query Operators
+170 | 
+171 | ```typescript
+172 | import { eq, gt, lt, gte, lte } from "@arkiv-network/sdk/query"
+173 | 
+174 | eq('type', 'note')        // type = "note"
+175 | gt('priority', 3)          // priority > 3
+176 | lt('price', 1000)          // price < 1000
+177 | gte('created', timestamp)  // created >= timestamp
+178 | lte('expiration', limit)   // expiration <= limit
+179 | ```
+180 | 
+181 | ### Browser Usage with MetaMask
+182 | 
+183 | ```typescript
+184 | import { createWalletClient, createPublicClient, custom, http } from "@arkiv-network/sdk"
+185 | import { braga } from "@arkiv-network/sdk/chains"
+186 | 
+187 | // Request wallet connection
+188 | await window.ethereum.request({ method: 'eth_requestAccounts' })
+189 | 
+190 | // Use MetaMask as transport (no private key needed)
+191 | const walletClient = createWalletClient({
+192 |   chain: braga,
+193 |   transport: custom(window.ethereum),
+194 | })
+195 | 
+196 | // Public client for queries
+197 | const publicClient = createPublicClient({
+198 |   chain: braga,
+199 |   transport: http(),
+200 | })
+201 | ```
+202 | 
+203 | **Adding Arkiv Network to MetaMask:**
+204 | 
+205 | ```typescript
+206 | await window.ethereum.request({
+207 |   method: 'wallet_addEthereumChain',
+208 |   params: [{
+209 |     chainId: '0xe0087f86e',
+210 |     chainName: 'Arkiv Braga Testnet',
+211 |     nativeCurrency: { name: 'GLM', symbol: 'GLM', decimals: 18 },
+212 |     rpcUrls: ['https://braga.hoodi.arkiv.network/rpc'],
+213 |     blockExplorerUrls: ['https://explorer.braga.hoodi.arkiv.network']
+214 |   }]
+215 | })
+216 | ```
+217 | 
+218 | ### Browser CDN Imports
+219 | 
+220 | For static HTML/JS pages without a bundler:
+221 | 
+222 | ```javascript
+223 | import { createPublicClient, http } from 'https://esm.sh/@arkiv-network/sdk?target=es2022&bundle-deps'
+224 | import { eq } from 'https://esm.sh/@arkiv-network/sdk/query?target=es2022&bundle-deps'
+225 | import { braga } from 'https://esm.sh/@arkiv-network/sdk/chains?target=es2022&bundle-deps'
+226 | ```
+227 | 
+228 | If the user is working with a versioned CDN URL instead of the unpinned form above, make sure the selected SDK version is `0.6.5` or newer before using the `braga` import.
+229 | 
+
+
+--------------------------------------------------------------------------------
+/skills/arkiv-best-practices/references/integration-patterns.md:
+--------------------------------------------------------------------------------
+  1 | # Arkiv Integration Patterns
+  2 | 
+  3 | The three most common integration scenarios for Arkiv applications.
+  4 | 
+  5 | All Braga-based examples in this file assume `@arkiv-network/sdk` version `0.6.5` or higher. Before suggesting `import { braga } from "@arkiv-network/sdk/chains"`, have the agent check the user's installed SDK version and only recommend an upgrade if the project is below that minimum.
+  6 | 
+  7 | ## Table of Contents
+  8 | 
+  9 | 1. [Backend Read/Write](#backend-readwrite)
+ 10 | 2. [Client-Side Reading (React Hook)](#client-side-reading)
+ 11 | 3. [Client-Side Writing (Wallet Integration)](#client-side-writing)
+ 12 | 
+ 13 | ---
+ 14 | 
+ 15 | ## Backend Read/Write
+ 16 | 
+ 17 | For server-side applications (Next.js API routes, Express, any Node.js backend). The private key lives in environment variables — never in client code.
+ 18 | 
+ 19 | ```typescript
+ 20 | // lib/arkiv-server.ts
+ 21 | import { createWalletClient, createPublicClient, http } from "@arkiv-network/sdk"
+ 22 | import { privateKeyToAccount } from "@arkiv-network/sdk/accounts"
+ 23 | import { braga } from "@arkiv-network/sdk/chains"
+ 24 | import { ExpirationTime, jsonToPayload } from "@arkiv-network/sdk/utils"
+ 25 | import { eq } from "@arkiv-network/sdk/query"
+ 26 | import { PROJECT_ATTRIBUTE } from "./arkiv" // your project attribute
+ 27 | 
+ 28 | // Initialize clients ONCE at module level
+ 29 | const walletClient = createWalletClient({
+ 30 |   chain: braga,
+ 31 |   transport: http(),
+ 32 |   account: privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`),
+ 33 | })
+ 34 | 
+ 35 | const publicClient = createPublicClient({
+ 36 |   chain: braga,
+ 37 |   transport: http(),
+ 38 | })
+ 39 | 
+ 40 | // Write example
+ 41 | export async function createPost(title: string, content: string) {
+ 42 |   const { entityKey, txHash } = await walletClient.createEntity({
+ 43 |     payload: jsonToPayload({ title, content }),
+ 44 |     contentType: "application/json",
+ 45 |     attributes: [
+ 46 |       PROJECT_ATTRIBUTE,
+ 47 |       { key: "entityType", value: "post" },
+ 48 |       { key: "created", value: Date.now() },
+ 49 |     ],
+ 50 |     expiresIn: ExpirationTime.fromDays(30),
+ 51 |   })
+ 52 |   return { entityKey, txHash }
+ 53 | }
+ 54 | 
+ 55 | // Read example
+ 56 | export async function getPosts() {
+ 57 |   const query = publicClient.buildQuery()
+ 58 |   const result = await query
+ 59 |     .where([
+ 60 |       eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+ 61 |       eq("entityType", "post"),
+ 62 |     ])
+ 63 |     .withPayload(true)
+ 64 |     .withMetadata(true)
+ 65 |     .limit(50)
+ 66 |     .fetch()
+ 67 |   return result
+ 68 | }
+ 69 | ```
+ 70 | 
+ 71 | Use in a Next.js API route:
+ 72 | 
+ 73 | ```typescript
+ 74 | // app/api/posts/route.ts
+ 75 | import { createPost, getPosts } from "@/lib/arkiv-server"
+ 76 | 
+ 77 | export async function GET() {
+ 78 |   const posts = await getPosts()
+ 79 |   return Response.json(posts)
+ 80 | }
+ 81 | 
+ 82 | export async function POST(request: Request) {
+ 83 |   const { title, content } = await request.json()
+ 84 |   const result = await createPost(title, content)
+ 85 |   return Response.json(result)
+ 86 | }
+ 87 | ```
+ 88 | 
+ 89 | Or in Express:
+ 90 | 
+ 91 | ```typescript
+ 92 | import express from "express"
+ 93 | import { createPost, getPosts } from "./lib/arkiv-server"
+ 94 | 
+ 95 | const app = express()
+ 96 | app.use(express.json())
+ 97 | 
+ 98 | app.get("/posts", async (req, res) => {
+ 99 |   const posts = await getPosts()
+100 |   res.json(posts)
+101 | })
+102 | 
+103 | app.post("/posts", async (req, res) => {
+104 |   const { title, content } = req.body
+105 |   const result = await createPost(title, content)
+106 |   res.json(result)
+107 | })
+108 | 
+109 | app.listen(3000)
+110 | ```
+111 | 
+112 | ---
+113 | 
+114 | ## Client-Side Reading
+115 | 
+116 | For frontend applications that only need to query data. Uses a public client — no private key, safe to run in the browser.
+117 | 
+118 | First, define the fetcher functions separately from hooks — these are reusable and testable:
+119 | 
+120 | ```typescript
+121 | // lib/arkiv-queries.ts
+122 | import { createPublicClient, http } from "@arkiv-network/sdk"
+123 | import { braga } from "@arkiv-network/sdk/chains"
+124 | import { eq } from "@arkiv-network/sdk/query"
+125 | import { PROJECT_ATTRIBUTE } from "@/lib/arkiv"
+126 | 
+127 | // Single public client instance — reuse across all queries
+128 | export const publicClient = createPublicClient({
+129 |   chain: braga,
+130 |   transport: http(),
+131 | })
+132 | 
+133 | export async function fetchEntitiesByType<T>(entityType: string): Promise<(T & { arkivEntityKey: string })[]> {
+134 |   const query = publicClient.buildQuery()
+135 |   const result = await query
+136 |     .where([
+137 |       eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+138 |       eq("entityType", entityType),
+139 |     ])
+140 |     .withPayload(true)
+141 |     .withMetadata(true)
+142 |     .limit(50)
+143 |     .fetch()
+144 | 
+145 |   // Combine entity key with payload — gives each item a stable unique identifier
+146 |   return result.entities
+147 |     .map((entity: any) => {
+148 |       try {
+149 |         return { arkivEntityKey: entity.key, ...entity.toJson() }
+150 |       } catch {
+151 |         return null
+152 |       }
+153 |     })
+154 |     .filter((item): item is T & { arkivEntityKey: string } => item !== null)
+155 | }
+156 | 
+157 | export async function fetchEntityByKey<T>(entityKey: string): Promise<T> {
+158 |   const entity = await publicClient.getEntity(entityKey)
+159 |   return entity.toJson()
+160 | }
+161 | ```
+162 | 
+163 | Then wrap them in hooks. Use TanStack Query (`@tanstack/react-query`) for caching, deduplication, and background refetching. **If the project already has a data-fetching library (SWR, Apollo, etc.), use that instead.** If nothing is set up yet, suggest installing TanStack Query:
+164 | 
+165 | ```bash
+166 | npm install @tanstack/react-query
+167 | ```
+168 | 
+169 | ```typescript
+170 | // hooks/useArkivQuery.ts
+171 | import { useQuery } from "@tanstack/react-query"
+172 | import { fetchEntitiesByType, fetchEntityByKey } from "@/lib/arkiv-queries"
+173 | 
+174 | /**
+175 |  * Fetch a list of entities by type.
+176 |  * Uses TanStack Query for caching and automatic refetching.
+177 |  */
+178 | export function useArkivQuery<T>(entityType: string) {
+179 |   return useQuery<T[]>({
+180 |     queryKey: ["arkiv", "entities", entityType],
+181 |     queryFn: () => fetchEntitiesByType<T>(entityType),
+182 |   })
+183 | }
+184 | 
+185 | /**
+186 |  * Fetch a single entity by key.
+187 |  * Only runs when entityKey is truthy.
+188 |  */
+189 | export function useArkivEntity<T>(entityKey: string | null) {
+190 |   return useQuery<T>({
+191 |     queryKey: ["arkiv", "entity", entityKey],
+192 |     queryFn: () => fetchEntityByKey<T>(entityKey!),
+193 |     enabled: !!entityKey,
+194 |   })
+195 | }
+196 | ```
+197 | 
+198 | Usage in components:
+199 | 
+200 | ```tsx
+201 | // components/PostList.tsx
+202 | import { useArkivQuery } from "@/hooks/useArkivQuery"
+203 | 
+204 | interface Post {
+205 |   title: string
+206 |   content: string
+207 | }
+208 | 
+209 | function PostList() {
+210 |   const { data: posts, isLoading, error } = useArkivQuery<Post>("post")
+211 | 
+212 |   if (isLoading) return <p>Loading...</p>
+213 |   if (error) return <p>Error: {error.message}</p>
+214 | 
+215 |   return (
+216 |     <ul>
+217 |       {posts?.map((post) => (
+218 |         <li key={post.arkivEntityKey}>{post.title}</li>
+219 |       ))}
+220 |     </ul>
+221 |   )
+222 | }
+223 | ```
+224 | 
+225 | > **Tip:** Every Arkiv entity has a unique `entity.key`. The fetcher merges it as `arkivEntityKey` into each item — use this as your React key instead of array indices.
+226 | > **Note:** `useEffect` + `useState` for data fetching is an anti-pattern — it doesn't handle caching, race conditions, deduplication, or background refetching. Always use a data-fetching library.
+227 | 
+228 | ---
+229 | 
+230 | ## Client-Side Writing
+231 | 
+232 | For dApps where the user's own wallet signs transactions. Two approaches depending on your stack.
+233 | 
+234 | ### Option A: Manual MetaMask integration
+235 | 
+236 | Use this if you're not using wagmi or a wallet framework. You need to handle network switching yourself.
+237 | 
+238 | **Adding the Arkiv network to MetaMask:**
+239 | 
+240 | ```typescript
+241 | async function addArkivNetwork() {
+242 |   await window.ethereum.request({
+243 |     method: "wallet_addEthereumChain",
+244 |     params: [{
+245 |       chainId: "0xe0087f86e",
+246 |       chainName: "Arkiv Braga Testnet",
+247 |       nativeCurrency: { name: "GLM", symbol: "GLM", decimals: 18 },
+248 |       rpcUrls: ["https://braga.hoodi.arkiv.network/rpc"],
+249 |       blockExplorerUrls: ["https://explorer.braga.hoodi.arkiv.network"],
+250 |     }],
+251 |   })
+252 | }
+253 | ```
+254 | 
+255 | **Creating a wallet client from MetaMask:**
+256 | 
+257 | ```typescript
+258 | import { createWalletClient, custom } from "@arkiv-network/sdk"
+259 | import { braga } from "@arkiv-network/sdk/chains"
+260 | 
+261 | await addArkivNetwork()
+262 | const [address] = await window.ethereum.request({ method: "eth_requestAccounts" })
+263 | 
+264 | const walletClient = createWalletClient({
+265 |   chain: braga,
+266 |   transport: custom(window.ethereum),
+267 | })
+268 | ```
+269 | 
+270 | ### Option B: Wagmi / RainbowKit integration (recommended for dApps)
+271 | 
+272 | If your project already uses wagmi (or a wagmi-powered framework like RainbowKit, ConnectKit, etc.), you can derive an Arkiv wallet client directly from the wagmi wallet client. This avoids duplicate wallet connection logic.
+273 | 
+274 | ```tsx
+275 | import { useAccount, useWalletClient } from "wagmi";
+276 | import {
+277 |   createWalletClient as createArkivWalletClient,
+278 |   custom,
+279 | } from "@arkiv-network/sdk";
+280 | import { braga } from "@arkiv-network/sdk/chains";
+281 | 
+282 | // Inside your component:
+283 | const { address } = useAccount();
+284 | const { data: wagmiWalletClient } = useWalletClient();
+285 | 
+286 | if (!wagmiWalletClient) {
+287 |   // throw or return loading UI
+288 | }
+289 | 
+290 | const arkivWalletClient = createArkivWalletClient({
+291 |   chain: braga,
+292 |   transport: custom(wagmiWalletClient.transport),
+293 |   account: address,
+294 | });
+295 | ```
+296 | 
+297 | Then use `arkivWalletClient` the same way as any other wallet client:
+298 | 
+299 | ```typescript
+300 | import { jsonToPayload, ExpirationTime } from "@arkiv-network/sdk/utils"
+301 | import { PROJECT_ATTRIBUTE } from "@/lib/arkiv"
+302 | 
+303 | const { entityKey, txHash } = await arkivWalletClient.createEntity({
+304 |   payload: jsonToPayload({ title: "My Post", content: "Hello!" }),
+305 |   contentType: "application/json",
+306 |   attributes: [
+307 |     PROJECT_ATTRIBUTE,
+308 |     { key: "entityType", value: "post" },
+309 |     { key: "author", value: address },
+310 |   ],
+311 |   expiresIn: ExpirationTime.fromDays(30),
+312 | })
+313 | ```
+314 | 
+
+
+--------------------------------------------------------------------------------
+/skills/arkiv-best-practices/SKILL.md:
+--------------------------------------------------------------------------------
+  1 | ---
+  2 | name: arkiv-best-practices
+  3 | description: Best practices, patterns, and practical examples for building applications with Arkiv — a decentralized Ethereum database with queryable, time-scoped storage. Use this skill whenever the user is working with Arkiv SDK, the @arkiv-network/sdk package, Arkiv entities, Arkiv queries, Arkiv attributes, ExpiresIn/expiration, the Braga testnet, or building any application that stores, queries, or manages data on the Arkiv network. Also use when the user mentions decentralized data storage on Ethereum, blockchain database, Web3 data storage, on-chain data, entity CRUD operations with expiration, arkiv_query, or migrating an Arkiv project from Kaolin to Braga.
+  4 | ---
+  5 | 
+  6 | # Arkiv Best Practices & Practical Examples
+  7 | 
+  8 | Arkiv is a decentralized data layer that brings queryable, time-scoped storage to Ethereum. It lets developers store, query, and manage data with built-in expiration and attribute systems. Think of it as an Ethereum-native database where every record (called an **entity**) has a payload, typed attributes for querying, and a programmable lifespan.
+  9 | 
+ 10 | ## Architecture Overview
+ 11 | 
+ 12 | Arkiv uses three layers:
+ 13 | 
+ 14 | 1. **Ethereum Mainnet** — Final settlement, proof verification, source of truth.
+ 15 | 2. **Arkiv Coordination Layer** — Data management, registry, cross-chain sync.
+ 16 | 3. **Specialized DB-Chains** — High-performance CRUD via JSON-RPC, indexed queries, programmable expiration.
+ 17 | 
+ 18 | ## Core Concepts
+ 19 | 
+ 20 | ### Entities
+ 21 | 
+ 22 | An entity is a data record containing:
+ 23 | 
+ 24 | - **Payload** — The actual data (JSON, text, binary)
+ 25 | - **Attributes** — Key-value pairs for querying (string or numeric)
+ 26 | - **ExpiresIn** — Automatic expiration measured in seconds (use `ExpirationTime` helpers)
+ 27 | - **Content Type** — MIME type of the payload
+ 28 | 
+ 29 | ### Attributes
+ 30 | 
+ 31 | Attributes are the backbone of querying. Use the right type for each attribute because it determines what query operators are available:
+ 32 | 
+ 33 | ```typescript
+ 34 | // String attributes — support eq(), glob matching (~)
+ 35 | { key: 'type', value: 'note' }
+ 36 | { key: 'status', value: 'active' }
+ 37 | 
+ 38 | // Numeric attributes — support eq(), gt(), lt(), gte(), lte() range queries
+ 39 | { key: 'priority', value: 5 }
+ 40 | { key: 'created', value: Date.now() }
+ 41 | ```
+ 42 | 
+ 43 | **Important:** If you store a number as a string (`{ key: 'priority', value: '5' }`), you lose the ability to do range queries with `gt()`, `lt()`, etc. Always use numeric values for attributes you plan to filter by range.
+ 44 | 
+ 45 | ### ExpiresIn
+ 46 | 
+ 47 | Every entity has a lifespan expressed in **seconds**. Always use the `ExpirationTime` helper to convert human-readable durations — never hardcode raw numbers:
+ 48 | 
+ 49 | ```typescript
+ 50 | import { ExpirationTime } from "@arkiv-network/sdk/utils";
+ 51 | 
+ 52 | ExpirationTime.fromMinutes(30); // 1800 seconds
+ 53 | ExpirationTime.fromHours(1); // 3600 seconds
+ 54 | ExpirationTime.fromHours(12); // 43200 seconds
+ 55 | ExpirationTime.fromHours(24); // 86400 seconds
+ 56 | ExpirationTime.fromDays(7); // 604800 seconds
+ 57 | ```
+ 58 | 
+ 59 | **Important:** The `expiresIn` field takes a value in **seconds**. A raw number like `expiresIn: 3600` means 3600 seconds (1 hour). Always prefer `ExpirationTime.fromMinutes()`, `ExpirationTime.fromHours()`, or `ExpirationTime.fromDays()` for readability and to avoid mistakes.
+ 60 | 
+ 61 | Entities can be extended before they expire using `extendEntity()`. Over-allocating expiration wastes storage fees — start short and extend if needed.
+ 62 | 
+ 63 | ## SDK Setup
+ 64 | 
+ 65 | Arkiv provides a TypeScript SDK. For detailed SDK reference, read `references/sdk-reference.md`.
+ 66 | 
+ 67 | ### TypeScript (Node.js / Bun)
+ 68 | 
+ 69 | ```bash
+ 70 | npm install @arkiv-network/sdk
+ 71 | # or
+ 72 | bun add @arkiv-network/sdk
+ 73 | ```
+ 74 | 
+ 75 | Before suggesting `import { braga } from "@arkiv-network/sdk/chains"`, check that the project is using `@arkiv-network/sdk` version `0.6.5` or higher. Do not pin the install command unless the user explicitly asks for that; instead, tell the agent to verify the currently installed version and upgrade only if needed.
+ 76 | 
+ 77 | Two client types exist:
+ 78 | 
+ 79 | 1. **WalletClient** (read/write) — Requires a private key. Use for creating, updating, deleting entities.
+ 80 | 2. **PublicClient** (read-only) — No private key needed. Use for queries.
+ 81 | 
+ 82 | ```typescript
+ 83 | import {
+ 84 |   createWalletClient,
+ 85 |   createPublicClient,
+ 86 |   http,
+ 87 | } from "@arkiv-network/sdk";
+ 88 | import { privateKeyToAccount } from "@arkiv-network/sdk/accounts";
+ 89 | import { braga } from "@arkiv-network/sdk/chains";
+ 90 | 
+ 91 | // Write operations — keep private key in env vars, never hardcode
+ 92 | const walletClient = createWalletClient({
+ 93 |   chain: braga,
+ 94 |   transport: http(),
+ 95 |   account: privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`),
+ 96 | });
+ 97 | 
+ 98 | // Read operations — safe for frontend/public use
+ 99 | const publicClient = createPublicClient({
+100 |   chain: braga,
+101 |   transport: http(),
+102 | });
+103 | ```
+104 | 
+105 | Braga is the current Arkiv testnet. If you are upgrading an existing Kaolin project, read `references/migration-guide.md` before editing code so you update chain imports, RPC URLs, wallet config, and seed data together.
+106 | 
+107 | ## CRUD Operations
+108 | 
+109 | ### Create
+110 | 
+111 | ```typescript
+112 | import { jsonToPayload, ExpirationTime } from "@arkiv-network/sdk/utils";
+113 | 
+114 | const { entityKey, txHash } = await walletClient.createEntity({
+115 |   payload: jsonToPayload({ title: "My Note", content: "Hello Arkiv!" }),
+116 |   contentType: "application/json",
+117 |   attributes: [
+118 |     { key: "type", value: "note" },
+119 |     { key: "id", value: crypto.randomUUID() },
+120 |     { key: "created", value: Date.now() },
+121 |   ],
+122 |   expiresIn: ExpirationTime.fromHours(12),
+123 | });
+124 | ```
+125 | 
+126 | ### Read / Query
+127 | 
+128 | ```typescript
+129 | import { eq, gt } from "@arkiv-network/sdk/query";
+130 | 
+131 | const query = publicClient.buildQuery();
+132 | const result = await query
+133 |   .where(eq("type", "note"))
+134 |   .where(gt("created", Date.now() - 86400000))
+135 |   .withPayload(true)
+136 |   .withAttributes(true)
+137 |   .limit(10)
+138 |   .fetch();
+139 | 
+140 | console.log("Found entities:", result.entities);
+141 | 
+142 | // Pagination — fetch the next page if one exists
+143 | if (result.hasNextPage()) {
+144 |   await result.next();
+145 |   console.log("Next page:", result.entities);
+146 | }
+147 | 
+148 | // Get a specific entity by key
+149 | const entity = await publicClient.getEntity(entityKey);
+150 | ```
+151 | 
+152 | ### Update
+153 | 
+154 | ```typescript
+155 | await walletClient.updateEntity({
+156 |   entityKey: entityKey,
+157 |   payload: jsonToPayload({ title: "Updated", content: "New content" }),
+158 |   contentType: "application/json",
+159 |   attributes: [
+160 |     { key: "type", value: "note" },
+161 |     { key: "updated", value: Date.now() },
+162 |   ],
+163 |   expiresIn: ExpirationTime.fromHours(24),
+164 | });
+165 | ```
+166 | 
+167 | ### Delete
+168 | 
+169 | ```typescript
+170 | await walletClient.deleteEntity({ entityKey });
+171 | ```
+172 | 
+173 | ### Extend Expiration
+174 | 
+175 | ```typescript
+176 | await walletClient.extendEntity({
+177 |   entityKey: entityKey,
+178 |   expiresIn: ExpirationTime.fromHours(1), // always use the helper
+179 | });
+180 | ```
+181 | 
+182 | ## Best Practices
+183 | 
+184 | ### 1. Always Use a Project Attribute
+185 | 
+186 | All entities in Arkiv are public and stored in a shared database. Every project **must** define a unique project attribute and include it on every entity. This is how you distinguish your app's data from everyone else's.
+187 | 
+188 | Create a dedicated file (e.g., `lib/arkiv.ts` or `constants/arkiv.ts`) that exports this attribute:
+189 | 
+190 | ```typescript
+191 | /** All entities created by this app share this attribute for easy filtering. */
+192 | export const PROJECT_ATTRIBUTE = {
+193 |   key: "project",
+194 |   value: "<GLOBALLY_UNIQUE_STRING_THAT_IDENTIFIES_THE_PROJECT>",
+195 | } as const;
+196 | 
+197 | if (!PROJECT_ATTRIBUTE.value) {
+198 |   throw new Error(
+199 |     "Please set the value of PROJECT_ATTRIBUTE to a unique string that identifies your project. This will help you filter and manage your entities on the Arkiv network.",
+200 |   );
+201 | }
+202 | ```
+203 | 
+204 | When creating this file, come up with a globally unique value — for example, a combination of your project name, organization, and a short random suffix (e.g., `"myapp-acme-7x9k"`).
+205 | 
+206 | Then include `PROJECT_ATTRIBUTE` in **every** create/update call and **every** query:
+207 | 
+208 | ```typescript
+209 | // Creating — always include PROJECT_ATTRIBUTE
+210 | const { entityKey, txHash } = await walletClient.createEntity({
+211 |   payload: jsonToPayload({ title, content }),
+212 |   contentType: "application/json",
+213 |   attributes: [PROJECT_ATTRIBUTE, { key: "entityType", value: "post" }],
+214 |   expiresIn: ExpirationTime.fromDays(30),
+215 | });
+216 | 
+217 | // Querying — always filter by PROJECT_ATTRIBUTE
+218 | const result = await query
+219 |   .where([
+220 |     eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+221 |     eq("entityType", "post"),
+222 |   ])
+223 |   .withPayload(true)
+224 |   .withMetadata(true)
+225 |   .limit(50)
+226 |   .fetch();
+227 | ```
+228 | 
+229 | Without this, your queries will return data from other projects, and other projects will see yours. This is the single most important practice for any Arkiv project.
+230 | 
+231 | ### 2. Separate Read and Write Clients
+232 | 
+233 | Always use `createPublicClient` for queries. It prevents accidental writes, doesn't require a private key, and is safe for frontend/public use. Reserve `createWalletClient` for backend services that need to create/update/delete.
+234 | 
+235 | ### 3. Design Attributes for Queryability
+236 | 
+237 | Think about how you'll query data when you choose attributes. Attributes are your indexes — without the right ones, you'll be fetching too much data and filtering client-side.
+238 | 
+239 | ```typescript
+240 | // Good: attributes map to your query patterns
+241 | attributes: [
+242 |   { key: "type", value: "vote" }, // filter by entity type
+243 |   { key: "proposalKey", value: proposalId }, // link related entities
+244 |   { key: "voter", value: voterAddr }, // filter by user
+245 |   { key: "choice", value: "yes" }, // filter by value
+246 |   { key: "weight", value: 1 }, // numeric for aggregation
+247 | ];
+248 | ```
+249 | 
+250 | ### 4. Use Batch Operations
+251 | 
+252 | Individual creates in a loop are slow and expensive. Use `mutateEntities()` for batch creates:
+253 | 
+254 | ```typescript
+255 | // Bad — sequential, slow
+256 | for (const item of items) {
+257 |   await walletClient.createEntity(item);
+258 | }
+259 | 
+260 | // Good — single batch operation
+261 | await walletClient.mutateEntities({
+262 |   creates: items.map((item) => ({
+263 |     payload: jsonToPayload(item.data),
+264 |     contentType: "application/json",
+265 |     attributes: item.attributes,
+266 |     expiresIn: ExpirationTime.fromHours(1),
+267 |   })),
+268 | });
+269 | ```
+270 | 
+271 | ### 5. Write Specific Queries
+272 | 
+273 | Broad queries return too much data and cost more. Always add multiple filter criteria:
+274 | 
+275 | ```typescript
+276 | // Bad — returns every note ever
+277 | await query.where(eq("type", "note")).fetch();
+278 | 
+279 | // Good — narrows down to what you actually need
+280 | await query
+281 |   .where(eq("type", "note"))
+282 |   .where(gt("created", Date.now() - 86400000))
+283 |   .where(gt("priority", 3))
+284 |   .fetch();
+285 | ```
+286 | 
+287 | ### 6. Right-Size Expiration
+288 | 
+289 | Match `expiresIn` to actual data lifetime. Session data gets 30 minutes, not 7 days. Cache gets 1 hour. Don't over-allocate — it costs more and pollutes queries with stale data before cleanup.
+290 | 
+291 | ### 7. Never Expose Private Keys
+292 | 
+293 | ```typescript
+294 | // Always load from environment
+295 | const privateKey = process.env.PRIVATE_KEY;
+296 | 
+297 | // Never hardcode
+298 | const privateKey = "0x1234..."; // DANGEROUS
+299 | ```
+300 | 
+301 | ### 8. Validate Input Before Storing
+302 | 
+303 | Check length and content before creating entities. Arkiv stores what you give it — garbage in, garbage out.
+304 | 
+305 | ### 9. Use Numeric Types for Numeric Data
+306 | 
+307 | If you'll filter or sort by a value, store it as a number attribute. String attributes only support equality and glob matching.
+308 | 
+309 | ### 10. Model Related Data with Shared Attributes
+310 | 
+311 | Link entities together using a shared attribute key (like `proposalKey` in a voting system). This is Arkiv's version of foreign keys:
+312 | 
+313 | ```typescript
+314 | // Proposal entity
+315 | attributes: [{ key: "type", value: "proposal" }];
+316 | 
+317 | // Vote entities reference the proposal
+318 | attributes: [
+319 |   { key: "type", value: "vote" },
+320 |   { key: "proposalKey", value: proposalEntityKey },
+321 | ];
+322 | 
+323 | // Query all votes for a proposal
+324 | await query
+325 |   .where(eq("type", "vote"))
+326 |   .where(eq("proposalKey", proposalEntityKey))
+327 |   .fetch();
+328 | ```
+329 | 
+330 | ### 11. Understand $owner vs $creator
+331 | 
+332 | Every Arkiv entity has two special metadata fields:
+333 | 
+334 | - **$owner** — The wallet address that currently owns the entity. The owner has permission to update, delete, and extend the entity. **Ownership can be transferred**, so the owner may change over an entity's lifetime.
+335 | - **$creator** — The wallet address that originally created the entity. This is **set at creation time and is immutable** — it can never change. Being the creator does not grant any special privileges (only the owner can modify/delete).
+336 | 
+337 | Query these with `.ownedBy()` and `.createdBy()`, or include them in results with `.withMetadata(true)`:
+338 | 
+339 | ```typescript
+340 | // Filter by current owner
+341 | const owned = await publicClient
+342 |   .buildQuery()
+343 |   .where(eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value))
+344 |   .ownedBy("0xOwnerAddress")
+345 |   .withPayload(true)
+346 |   .withMetadata(true)
+347 |   .fetch();
+348 | 
+349 | // Filter by original creator (immutable, tamper-proof)
+350 | const created = await publicClient
+351 |   .buildQuery()
+352 |   .where(eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value))
+353 |   .createdBy("0xCreatorAddress")
+354 |   .withPayload(true)
+355 |   .withMetadata(true)
+356 |   .fetch();
+357 | ```
+358 | 
+359 | **When to use which:**
+360 | 
+361 | - Use **$creator** (`createdBy`) when you need a tamper-proof guarantee of who originally wrote the data (e.g., verifying data came from your trusted backend). Since it's immutable, it cannot be spoofed after creation.
+362 | - Use **$owner** (`ownedBy`) when you need to know who currently controls the entity (e.g., checking who can modify it). Be aware that ownership can change.
+363 | 
+364 | ### 12. Filter by Creator Wallet for Trusted Data
+365 | 
+366 | When your app has a backend that publishes data to Arkiv and a frontend that reads it, filtering by `PROJECT_ATTRIBUTE` alone is **not enough**. A malicious actor can create entities with your project attribute to inject fake data into your dashboard.
+367 | 
+368 | The solution: combine `PROJECT_ATTRIBUTE` filtering with `.createdBy()` to only accept entities created by your trusted backend wallet:
+369 | 
+370 | ```typescript
+371 | // lib/arkiv.ts — export your trusted backend wallet address
+372 | export const PROJECT_ATTRIBUTE = {
+373 |   key: "project",
+374 |   value: "myapp-acme-7x9k",
+375 | } as const;
+376 | 
+377 | /** The wallet address of the backend that publishes trusted data. */
+378 | export const CREATOR_WALLET_ADDRESS = "0xYourBackendWalletAddress";
+379 | ```
+380 | 
+381 | ```typescript
+382 | // Reading trusted data only
+383 | import { PROJECT_ATTRIBUTE, CREATOR_WALLET_ADDRESS } from "@/lib/arkiv";
+384 | 
+385 | const trustedPosts = await publicClient
+386 |   .buildQuery()
+387 |   .where([
+388 |     eq(PROJECT_ATTRIBUTE.key, PROJECT_ATTRIBUTE.value),
+389 |     eq("entityType", "post"),
+390 |   ])
+391 |   .createdBy(CREATOR_WALLET_ADDRESS)
+392 |   .withPayload(true)
+393 |   .withMetadata(true)
+394 |   .fetch();
+395 | ```
+396 | 
+397 | This works because `$creator` is immutable — no one can create an entity and fake the creator address. Even if someone creates an entity with your project attribute, it won't pass the `.createdBy()` filter unless it was actually created by your whitelisted wallet.
+398 | 
+399 | **Use this pattern whenever:**
+400 | 
+401 | - Your backend publishes data that a frontend/dashboard reads
+402 | - You need to trust the source of entities
+403 | - You're building any system where data integrity matters
+404 | 
+405 | ### 13. Handle Errors Gracefully
+406 | 
+407 | The Arkiv SDK does not retry on failure — all methods throw on error. Write operations (create, update, delete, extend) can fail for several reasons: the user rejects the transaction in MetaMask, the wallet has insufficient gas, the RPC endpoint is unreachable, or the entity has already expired. Wrap write operations in try/catch and handle each failure mode appropriately:
+408 | 
+409 | ```typescript
+410 | try {
+411 |   const { entityKey, txHash } = await walletClient.createEntity({
+412 |     payload: jsonToPayload({ title: "My Post" }),
+413 |     contentType: "application/json",
+414 |     attributes: [PROJECT_ATTRIBUTE, { key: "entityType", value: "post" }],
+415 |     expiresIn: ExpirationTime.fromHours(12),
+416 |   });
+417 | } catch (error) {
+418 |   // Common failures:
+419 |   // - User rejected the transaction (MetaMask popup dismissed)
+420 |   // - Insufficient funds / gas
+421 |   // - Network error (RPC unreachable)
+422 |   // - Entity already expired (for update/extend)
+423 |   console.error("Transaction failed:", error);
+424 | }
+425 | ```
+426 | 
+427 | Read operations (`buildQuery().fetch()`, `getEntity()`) can also throw on network errors. If your app needs retries, implement them yourself — the SDK won't do it for you.
+428 | 
+429 | ### 14. Validate Entity Data and Model Relationships
+430 | 
+431 | Two important advanced patterns for production Arkiv apps:
+432 | 
+433 | - **Schema validation** — `entity.toJson()` returns `any`. Always validate with a schema library (zod, valibot, etc.) to protect against malformed payloads and namespace collisions.
+434 | - **Relationship entities** — Arkiv attributes are flat key-value pairs with no array type. To model one-to-many or many-to-many relationships (tags, skills, memberships), create separate relationship entities instead of encoding lists into attributes.
+435 | 
+436 | For full examples and code for both patterns, read `references/advanced-patterns.md`.
+437 | 
+438 | ## Migration from Kaolin to Braga
+439 | 
+440 | When a user wants to upgrade an existing Arkiv project, treat it as a migration instead of a generic refactor. The SDK API is unchanged; the main work is swapping the target chain, updating wallet/network config, renaming Kaolin-specific env vars, and recreating testnet data that lived on Kaolin.
+441 | 
+442 | Follow this sequence:
+443 | 
+444 | 1. Read `references/migration-guide.md` before making edits.
+445 | 2. Check the installed `@arkiv-network/sdk` version first. The `braga` chain export is only available in `0.6.5` or higher.
+446 | 3. Replace `kaolin` chain imports/usages with `braga`.
+447 | 4. Update RPC URLs, WebSocket URLs, chain IDs, explorer links, faucet links, and wallet `nativeCurrency` from ETH to GLM.
+448 | 5. Rename env vars and config keys so `KAOLIN_*` names do not remain in active codepaths.
+449 | 6. Re-seed or recreate any entities the app expects on startup, because Kaolin state does not migrate to Braga.
+450 | 
+451 | Keep Kaolin only as legacy context during migration work. For new code, examples, and setup instructions, default to Braga.
+452 | 
+453 | ## Reference Files
+454 | 
+455 | The `references/` directory contains detailed documentation for specific topics. Read these when you need deeper information:
+456 | 
+457 | - **`references/sdk-reference.md`** — Full SDK API surface: all WalletClient/PublicClient methods, query builder API, ExpirationTime helpers, payload utilities, MetaMask browser usage, and CDN imports.
+458 | - **`references/integration-patterns.md`** — Three integration scenarios: backend read/write (Next.js/Express), client-side reading (TanStack Query hooks), and client-side writing (MetaMask and wagmi/RainbowKit).
+459 | - **`references/api-reference.md`** — Raw JSON-RPC 2.0 API: `arkiv_query` syntax, query operators, synthetic attributes (`$owner`, `$creator`, `$key`), pagination with cursors, and utility methods.
+460 | - **`references/advanced-patterns.md`** — Advanced data modeling: schema validation with zod/valibot, and modeling lists with relationship entities.
+461 | - **`references/migration-guide.md`** — Step-by-step Kaolin to Braga migration checklist: chain swaps, env/config updates, wallet settings, faucet, bridge changes, and reseeding testnet data.
+462 | 
+463 | ## Testnet Resources
+464 | 
+465 | | Resource | URL                                            |
+466 | | -------- | ---------------------------------------------- |
+467 | | Chain ID | `60138453102`                                  |
+468 | | HTTP RPC | `https://braga.hoodi.arkiv.network/rpc`        |
+469 | | Faucet   | `https://braga.hoodi.arkiv.network/faucet/`    |
+470 | | Explorer | `https://explorer.braga.hoodi.arkiv.network/`  |
+471 | 
+472 | ## Troubleshooting
+473 | 
+474 | - **"Invalid sender"** — Your RPC URL may point to the wrong network. Verify it matches Braga.
+475 | - **"Insufficient funds"** — Get test GLM from the Braga faucet. Writes require gas.
+476 | - **Queries return empty** — Check that attributes match exactly (case-sensitive). Verify entities haven't expired.
+477 | 
+
+
+--------------------------------------------------------------------------------

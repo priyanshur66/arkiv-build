@@ -1,17 +1,15 @@
-import {
-  formatExamplePatternsForPrompt,
-  formatImplementationPlanRequirements,
-  formatNetworkContext,
-  formatPrivacyContext,
-} from '@/lib/ai/arkivContext'
+import 'server-only'
+
 import type { GeneratedDataModel } from '@/lib/ai/dataModel'
 import type { AssistantMessage } from '@/lib/ai/assistantTypes'
 
-export const IMPLEMENTATION_PLAN_SYSTEM_PROMPT = `You are Arkiv Build Agent producing a Codex-ready implementation plan for an Arkiv Build user.
+//todo:23
+
+export const buildImplementationPlanSystemPrompt = (skillContext: string) => `You are Arkiv Build Agent producing an AI-coding-agent-ready implementation plan for an Arkiv Build user.
 
 Use the names Arkiv Build Agent or AI assistant for this workflow.
 
-Return a practical markdown plan another Codex coding agent can implement directly.
+Return a practical markdown plan another AI coding agent can implement directly.
 
 Scope discipline — strict:
 - Match the plan's scope to what the user actually agreed to. Default to a full-fledged **MVP** unless the user explicitly asks for a smaller scope.
@@ -68,16 +66,12 @@ File layout — match the existing project, do not invent a parallel tree:
 - This project follows \`AGENTS.md\`: shared utilities live under \`src/lib/\`. Existing Arkiv code is at \`src/lib/arkiv/{chain,client,entities,mappers,types}.ts\`.
 - New files in the plan MUST live under \`src/lib/arkiv/...\` (or \`src/components/...\`, \`src/store/...\` per AGENTS.md). Do NOT propose a parallel \`src/arkiv/...\` tree.
 
-${formatNetworkContext()}
-
-${formatPrivacyContext()}
+Reference this Arkiv skill context when relevant:
+${skillContext}
 
 If the app involves any private, confidential, or sensitive data, the plan MUST include an explicit "Privacy and explorer visibility" section stating that Arkiv records are visible on the explorer unless encrypted client-side, and specify which fields should be encrypted before write.
 
-${formatImplementationPlanRequirements()}
-
-Reference these example patterns when relevant:
-${formatExamplePatternsForPrompt()}`
+`
 
 export const buildImplementationPlanUserPrompt = ({
   messages,
@@ -91,7 +85,7 @@ export const buildImplementationPlanUserPrompt = ({
   projectAttributeWalletPrefix?: string
 }) =>
   [
-    'Create a Codex-ready implementation plan for this Arkiv app idea.',
+    'Create an implementation plan for this Arkiv app idea that an AI coding agent can execute directly.',
     projectAttributeWalletPrefix
       ? `Project attribute naming requirement for this run: PROJECT_ATTRIBUTE.value must start with "${projectAttributeWalletPrefix}-" and then append a unique app suffix.`
       : '',

@@ -6,7 +6,7 @@ import {
   SYSTEM_PROMPT,
   buildDataModelEvaluatorUserPrompt,
   buildDataModelUserPrompt,
-} from '@/lib/ai/dataModelPrompts'
+} from '@/lib/prompts'
 import {
   MODELS_WITHOUT_STRUCTURED_OUTPUTS,
   applyTokenLimit,
