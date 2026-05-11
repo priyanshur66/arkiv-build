@@ -2,18 +2,25 @@ import dagre from 'dagre'
 import { MarkerType } from '@xyflow/react'
 
 import type { SchemaEdge, SchemaNode } from '@/store/useSchemaStore'
+import { EXPIRATION_DURATION_OPTIONS } from '@/lib/arkiv/types'
 import type {
   EntityDataField,
   EntityField,
   ExpirationDuration,
   IndexedAttributeType,
 } from '@/lib/arkiv/types'
+import {
+  SCHEMA_DATA_FIELD_ID_PREFIX,
+  SCHEMA_DEFAULT_EXPIRATION_DURATION,
+  SCHEMA_EDGE_ID_PREFIX,
+  SCHEMA_ENTITY_NODE_WIDTH,
+  SCHEMA_ENTITY_START_X,
+  SCHEMA_ENTITY_START_Y,
+  SCHEMA_FIELD_ID_PREFIX,
+  SCHEMA_NODE_ID_PREFIX,
+} from '@/lib/constants/schema'
 import { sanitizeIdentifier } from '@/lib/arkiv/schema'
 
-const EXPIRATION_DURATIONS: ExpirationDuration[] = ['1d', '7d', '30d', '90d', '365d']
-const ENTITY_START_X = 96
-const ENTITY_START_Y = 140
-const ENTITY_NODE_WIDTH = 544
 const ENTITY_NODE_HEIGHT = 110
 const DAGRE_RANK_SEP = 250
 const DAGRE_NODE_SEP = 130
@@ -97,9 +104,9 @@ const ensureStringArray = (value: unknown) =>
   Array.isArray(value) ? value.map((item) => ensureString(item).trim()).filter(Boolean) : []
 
 const ensureExpirationDuration = (value: unknown): ExpirationDuration =>
-  typeof value === 'string' && EXPIRATION_DURATIONS.includes(value as ExpirationDuration)
+  typeof value === 'string' && EXPIRATION_DURATION_OPTIONS.includes(value as ExpirationDuration)
     ? (value as ExpirationDuration)
-    : '30d'
+    : SCHEMA_DEFAULT_EXPIRATION_DURATION
 
 const ensureIndexedAttributeType = (value: unknown): IndexedAttributeType =>
   value === 'indexedNumber' ? 'indexedNumber' : 'indexedString'
@@ -308,14 +315,14 @@ const createField = (
   type: IndexedAttributeType,
   value: string,
 ): EntityField => ({
-  id: `field-${crypto.randomUUID()}`,
+  id: `${SCHEMA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
   name,
   type,
   value,
 })
 
 const createDataField = (key: string, value: string): EntityDataField => ({
-  id: `data-${crypto.randomUUID()}`,
+  id: `${SCHEMA_DATA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
   key,
   value,
 })
@@ -326,7 +333,7 @@ const createUniqueEdgeId = (
   edgeName: string,
   seenEdgeIds: Set<string>,
 ) => {
-  const baseEdgeId = `xy-edge__${sourceNodeId}-null-${targetNodeId}-null-${sanitizeIdentifier(edgeName) || 'relation'}`
+  const baseEdgeId = `${SCHEMA_EDGE_ID_PREFIX}${sourceNodeId}-null-${targetNodeId}-null-${sanitizeIdentifier(edgeName) || 'relation'}`
 
   if (!seenEdgeIds.has(baseEdgeId)) {
     seenEdgeIds.add(baseEdgeId)
@@ -398,7 +405,7 @@ const buildGeneratedLayout = (
 
   entities.forEach((entity) => {
     graph.setNode(entity.schemaName, {
-      width: ENTITY_NODE_WIDTH,
+      width: SCHEMA_ENTITY_NODE_WIDTH,
       height: ENTITY_NODE_HEIGHT,
     })
   })
@@ -419,8 +426,12 @@ const buildGeneratedLayout = (
   const initialPositions = new Map(
     entities.map((entity) => {
       const node = graph.node(entity.schemaName)
-      const x = node ? node.x - ENTITY_NODE_WIDTH / 2 + ENTITY_START_X : ENTITY_START_X
-      const y = node ? node.y - ENTITY_NODE_HEIGHT / 2 + ENTITY_START_Y : ENTITY_START_Y
+      const x = node
+        ? node.x - SCHEMA_ENTITY_NODE_WIDTH / 2 + SCHEMA_ENTITY_START_X
+        : SCHEMA_ENTITY_START_X
+      const y = node
+        ? node.y - ENTITY_NODE_HEIGHT / 2 + SCHEMA_ENTITY_START_Y
+        : SCHEMA_ENTITY_START_Y
       return [entity.schemaName, { x, y }]
     }),
   )
@@ -521,7 +532,9 @@ const buildGeneratedLayout = (
     }
 
     rankGroups.forEach((group, rank) => {
-      const x = initialPositions.get(group[0])?.x ?? ENTITY_START_X + rank * DAGRE_RANK_SEP
+      const x =
+        initialPositions.get(group[0])?.x ??
+        SCHEMA_ENTITY_START_X + rank * DAGRE_RANK_SEP
       const centroidY =
         group.reduce((sum, node) => sum + (positionY.get(node) ?? 0), 0) /
         Math.max(group.length, 1)
@@ -567,7 +580,7 @@ export const buildSchemaGraphFromGeneratedModel = (
       return leftPosition.y - rightPosition.y
     })
     .forEach((entity) => {
-      const nodeId = `entity-${crypto.randomUUID()}`
+      const nodeId = `${SCHEMA_NODE_ID_PREFIX}${crypto.randomUUID()}`
       const fields = entity.indexedAttributes.map((attribute) =>
         createField(
           sanitizeIdentifier(attribute.name) || 'field',
@@ -582,8 +595,8 @@ export const buildSchemaGraphFromGeneratedModel = (
         ),
       )
       const position = layout.get(entity.schemaName) ?? {
-        x: ENTITY_START_X,
-        y: ENTITY_START_Y,
+        x: SCHEMA_ENTITY_START_X,
+        y: SCHEMA_ENTITY_START_Y,
       }
 
       const node: SchemaNode = {

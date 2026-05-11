@@ -24,6 +24,15 @@ import type {
   SystemAttribute,
 } from "@/lib/arkiv/types";
 import { mapSnapshotToNodeData } from "@/lib/arkiv/entityGraph";
+import {
+  SCHEMA_DATA_FIELD_ID_PREFIX,
+  SCHEMA_DEFAULT_EXPIRATION_DURATION,
+  SCHEMA_EDGE_ID_PREFIX,
+  SCHEMA_ENTITY_NODE_WIDTH,
+  SCHEMA_ENTITY_START_POSITION,
+  SCHEMA_FIELD_ID_PREFIX,
+  SCHEMA_NODE_ID_PREFIX,
+} from '@/lib/constants/schema'
 
 export type EntityNodeData = {
   mode: EntityNodeMode;
@@ -86,18 +95,16 @@ type SchemaState = {
   loadGraphOfEntities: (nodes: SchemaNode[], edges: SchemaEdge[]) => void;
 };
 
-const ENTITY_START_POSITION: XYPosition = { x: 96, y: 140 };
-const ENTITY_DEFAULT_WIDTH = 544;
 const ENTITY_HORIZONTAL_GAP = 96;
 
 const getNextEntityPosition = (nodes: SchemaNode[]): XYPosition => {
   if (nodes.length === 0) {
-    return ENTITY_START_POSITION;
+    return SCHEMA_ENTITY_START_POSITION;
   }
 
   const topMostY = Math.min(...nodes.map((node) => node.position.y));
   const rightMostX = Math.max(
-    ...nodes.map((node) => node.position.x + (node.measured?.width ?? ENTITY_DEFAULT_WIDTH)),
+    ...nodes.map((node) => node.position.x + (node.measured?.width ?? SCHEMA_ENTITY_NODE_WIDTH)),
   );
 
   return {
@@ -107,26 +114,26 @@ const getNextEntityPosition = (nodes: SchemaNode[]): XYPosition => {
 };
 
 const createEmptyField = (): EntityField => ({
-  id: `field-${crypto.randomUUID()}`,
+  id: `${SCHEMA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
   name: "",
   type: "indexedString",
   value: "",
 });
 
 const createEmptyDataField = (): EntityDataField => ({
-  id: `data-${crypto.randomUUID()}`,
+  id: `${SCHEMA_DATA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
   key: "",
   value: "",
 });
 
 const createDraftEntityNode = (position: XYPosition): SchemaNode => ({
-  id: `entity-${crypto.randomUUID()}`,
+  id: `${SCHEMA_NODE_ID_PREFIX}${crypto.randomUUID()}`,
   type: "entity",
   position,
   data: {
     mode: "draft",
     label: "",
-    expirationDuration: "30d",
+    expirationDuration: SCHEMA_DEFAULT_EXPIRATION_DURATION,
     fields: [createEmptyField()],
     dataFields: [createEmptyDataField()],
   },
@@ -146,7 +153,7 @@ const markSelectedNode = (nodes: SchemaNode[], nodeId: string) =>
   }));
 
 export const useSchemaStore = create<SchemaState>((set, get) => ({
-  nodes: [{ ...createDraftEntityNode(ENTITY_START_POSITION), selected: true }],
+  nodes: [{ ...createDraftEntityNode(SCHEMA_ENTITY_START_POSITION), selected: true }],
   edges: [],
   activeNodeId: undefined,
   onNodesChange: (changes) =>
@@ -190,7 +197,7 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
     }),
   onConnect: (connection) =>
     set((state) => {
-      const edgeId = `xy-edge__${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`;
+      const edgeId = `${SCHEMA_EDGE_ID_PREFIX}${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`;
       const newEdge: SchemaEdge = {
         ...connection,
         id: edgeId,
@@ -213,7 +220,7 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
         sourceLabelRaw.charAt(0).toLowerCase() + sourceLabelRaw.slice(1);
 
       const newField: EntityField = {
-        id: `field-${crypto.randomUUID()}`,
+        id: `${SCHEMA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
         name: `${sourceLabel}Id`,
         type: "indexedString",
         value: sourceNode.data.entityKey || "",
@@ -244,7 +251,7 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       };
     }),
   resetToSingleDraft: () => {
-    const nextNode = { ...createDraftEntityNode(ENTITY_START_POSITION), selected: true };
+    const nextNode = { ...createDraftEntityNode(SCHEMA_ENTITY_START_POSITION), selected: true };
 
     set({
       nodes: [nextNode],
@@ -288,7 +295,7 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       }
 
       const nextNode: SchemaNode = {
-        id: `entity-${crypto.randomUUID()}`,
+        id: `${SCHEMA_NODE_ID_PREFIX}${crypto.randomUUID()}`,
         type: "entity",
         position: getNextEntityPosition(state.nodes),
         data: mapSnapshotToNodeData(snapshot),

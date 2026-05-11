@@ -6,10 +6,14 @@ import type {
   OwnedArkivEntitySummary,
   PersistedEntitySnapshot,
 } from '@/lib/arkiv/types'
+import {
+  SCHEMA_EDGE_ID_PREFIX,
+  SCHEMA_ENTITY_START_X,
+  SCHEMA_ENTITY_START_Y,
+  SCHEMA_NODE_ID_PREFIX,
+} from '@/lib/constants/schema'
 import type { EntityNodeData, SchemaEdge, SchemaNode } from '@/store/useSchemaStore'
 
-const ENTITY_START_X = 96
-const ENTITY_START_Y = 140
 const ENTITY_HORIZONTAL_GAP = 600
 const ENTITY_VERTICAL_GAP = 300
 
@@ -146,7 +150,7 @@ const createUniquePersistedEdgeId = (
   fieldName: string,
   seenEdgeIds: Set<string>,
 ) => {
-  const edgeBaseId = `xy-edge__${sourceId}-null-${targetId}-null-${fieldName}`
+  const edgeBaseId = `${SCHEMA_EDGE_ID_PREFIX}${sourceId}-null-${targetId}-null-${fieldName}`
   let edgeId = edgeBaseId
   let duplicateIndex = 2
 
@@ -168,7 +172,7 @@ const decorateRelationFields = ({
   nodesMap: Map<Hex, EntityGraphNode>
   seenEdgeIds: Set<string>
 }) => {
-  const targetId = `entity-${snapshot.entityKey}`
+  const targetId = `${SCHEMA_NODE_ID_PREFIX}${snapshot.entityKey}`
   const fields: EntityField[] = snapshot.fields.map((field) => {
     const relationKey = field.value
 
@@ -184,7 +188,7 @@ const decorateRelationFields = ({
       }
     }
 
-    const sourceId = `entity-${relationKey}`
+    const sourceId = `${SCHEMA_NODE_ID_PREFIX}${relationKey}`
     const edgeId = createUniquePersistedEdgeId(
       sourceId,
       targetId,
@@ -233,7 +237,7 @@ export const buildCanvasGraphFromSnapshots = ({
       edges.push({
         id: field.edgeId,
         source: field.relationNodeId,
-        target: `entity-${node.snapshot.entityKey}`,
+        target: `${SCHEMA_NODE_ID_PREFIX}${node.snapshot.entityKey}`,
         sourceHandle: undefined,
         targetHandle: undefined,
         animated: true,
@@ -251,11 +255,11 @@ export const buildCanvasGraphFromSnapshots = ({
       }
 
       nodes.push({
-        id: `entity-${key}`,
+        id: `${SCHEMA_NODE_ID_PREFIX}${key}`,
         type: 'entity',
         position: {
-          x: ENTITY_START_X + level * ENTITY_HORIZONTAL_GAP,
-          y: ENTITY_START_Y + index * ENTITY_VERTICAL_GAP,
+          x: SCHEMA_ENTITY_START_X + level * ENTITY_HORIZONTAL_GAP,
+          y: SCHEMA_ENTITY_START_Y + index * ENTITY_VERTICAL_GAP,
         },
         data: {
           ...mapSnapshotToNodeData(nodeInfo.snapshot),

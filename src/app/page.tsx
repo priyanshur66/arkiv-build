@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Trash2,
   Clipboard,
+  ClipboardPaste,
   ArrowUp,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,7 +27,13 @@ import { TopNav } from "@/components/TopNav";
 import { UseCasePromptPanel } from "@/components/UseCasePromptPanel";
 import { Button } from "@/components/ui/button";
 import { EntityNode } from "@/components/EntityNode";
-import { serializeCanvasToGeneratedDataModel } from "@/lib/ai/dataModel";
+import {
+  buildSchemaGraphFromGeneratedModel,
+  normalizeGeneratedDataModel,
+  serializeCanvasToGeneratedDataModel,
+} from "@/lib/ai/dataModel";
+import { SCHEMA_ENTITY_NODE_WIDTH } from '@/lib/constants/schema'
+import { getErrorMessage } from "@/lib/errors";
 import { useArkivStore } from "@/store/useArkivStore";
 import { useSchemaStore } from "@/store/useSchemaStore";
 
@@ -36,6 +43,9 @@ const DEFAULT_EDGE_OPTIONS = {
   style: { strokeWidth: 2.5 },
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
 function SchemaCanvas() {
   const nodeTypes = useMemo(() => ({ entity: EntityNode }), []);
   const nodes = useSchemaStore((state) => state.nodes);
@@ -44,11 +54,13 @@ function SchemaCanvas() {
   const onEdgesChange = useSchemaStore((state) => state.onEdgesChange);
   const onConnect = useSchemaStore((state) => state.onConnect);
   const setActiveNode = useSchemaStore((state) => state.setActiveNode);
+  const loadGraphOfEntities = useSchemaStore((state) => state.loadGraphOfEntities);
   const clearCanvas = useSchemaStore((state) => state.clearCanvas);
   const initializeArkiv = useArkivStore((state) => state.initialize);
   const startBalanceSync = useArkivStore((state) => state.startBalanceSync);
   const [isMenuOpen, setIsMenuOpen] = useState(true);
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [isPastingModel, setIsPastingModel] = useState(false);
   const { setCenter, getNodes } = useReactFlow();
   const previousNodeIdsRef = useRef<Set<string>>(new Set());
   const nodeIdsKey = useMemo(() => nodes.map((node) => node.id).join('|'), [nodes]);
@@ -62,6 +74,28 @@ function SchemaCanvas() {
     }
 
     await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+  }
+
+  const handlePasteCanvasModel = async () => {
+    setIsPastingModel(true)
+
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const parsed = JSON.parse(clipboardText) as unknown
+      const candidateModel =
+        isRecord(parsed) && 'model' in parsed ? parsed.model : parsed
+      const model = normalizeGeneratedDataModel(candidateModel)
+      const { nodes: nextNodes, edges: nextEdges } =
+        buildSchemaGraphFromGeneratedModel(model)
+
+      loadGraphOfEntities(nextNodes, nextEdges)
+    } catch (error) {
+      window.alert(
+        `Unable to paste model. Make sure the clipboard contains valid Copy Model JSON.\n\n${getErrorMessage(error, 'Invalid model payload.')}`,
+      )
+    } finally {
+      setIsPastingModel(false)
+    }
   }
 
   useEffect(() => {
@@ -79,7 +113,7 @@ function SchemaCanvas() {
         addedNodes[addedNodes.length - 1];
 
       if (newestAddedNode) {
-        const width = newestAddedNode.measured?.width || 544;
+        const width = newestAddedNode.measured?.width || SCHEMA_ENTITY_NODE_WIDTH;
         const centerX = newestAddedNode.position.x + width / 2 + 400;
         const centerY = newestAddedNode.position.y + 500;
 
@@ -92,7 +126,7 @@ function SchemaCanvas() {
       allNodes.forEach((n) => {
         const x = n.position.x;
         const y = n.position.y;
-        const w = n.measured?.width || 544;
+        const w = n.measured?.width || SCHEMA_ENTITY_NODE_WIDTH;
 
         minX = Math.min(minX, x);
         minY = Math.min(minY, y);
@@ -153,14 +187,25 @@ function SchemaCanvas() {
         <div className="pointer-events-auto absolute top-[110px] right-6 z-20">
           <div className="ml-auto flex items-center gap-2">
             {isDevMode ? (
-              <Button
-                variant="outline"
-                onClick={() => void handleCopyCanvasModel()}
-                className="flex h-11 items-center gap-2 rounded-xl border border-[#ffc4a6] bg-[#fff8f4] px-4 font-bold shadow-sm transition hover:bg-[#fff0e8] text-[#ff7a45] hover:text-[#e66a39]"
-              >
-                <Clipboard className="size-4" />
-                Copy Model
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => void handleCopyCanvasModel()}
+                  className="flex h-11 items-center gap-2 rounded-xl border border-[#ffc4a6] bg-[#fff8f4] px-4 font-bold shadow-sm transition hover:bg-[#fff0e8] text-[#ff7a45] hover:text-[#e66a39]"
+                >
+                  <Clipboard className="size-4" />
+                  Copy Model
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void handlePasteCanvasModel()}
+                  disabled={isPastingModel}
+                  className="flex h-11 items-center gap-2 rounded-xl border border-[#ffc4a6] bg-[#fff8f4] px-4 font-bold shadow-sm transition hover:bg-[#fff0e8] text-[#ff7a45] hover:text-[#e66a39] disabled:opacity-50"
+                >
+                  <ClipboardPaste className="size-4" />
+                  {isPastingModel ? 'Pasting...' : 'Paste Model'}
+                </Button>
+              </>
             ) : null}
             <Button
               variant="outline"
