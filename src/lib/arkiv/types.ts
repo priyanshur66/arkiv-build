@@ -32,6 +32,7 @@ export type SystemAttribute = {
 export type OwnedArkivEntitySummary = {
   key: Hex;
   label: string;
+  projectAttributeValue?: string;
   preview: string;
   explorerUrl: string;
   compatible: boolean;
@@ -44,6 +45,7 @@ export type OwnedArkivEntitySummary = {
 export type PersistedEntitySnapshot = {
   entityKey: Hex;
   label: string;
+  projectAttributeValue?: string;
   fields: EntityField[];
   explorerUrl: string;
   systemAttributes: SystemAttribute[];

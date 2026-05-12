@@ -70,11 +70,13 @@ export function ArkivOwnedEntitiesPanel() {
                 className="group flex w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 text-left shadow-sm ring-1 ring-gray-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-500/10 hover:ring-[#ff7a45] hover:border-transparent active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-bold text-gray-900">
-                      {entity.label}
-                    </p>
-                  </div>
+                  {entity.projectAttributeValue ? (
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-bold text-gray-900">
+                        {entity.projectAttributeValue}
+                      </p>
+                    </div>
+                  ) : null}
                   <p className="mt-1 text-xs text-gray-600">
                     {entity.preview}
                   </p>

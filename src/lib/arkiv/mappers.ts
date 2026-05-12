@@ -13,6 +13,9 @@ import {
   type SystemAttribute,
 } from "@/lib/arkiv/types";
 
+const PROJECT_ATTRIBUTE_KEY = "PROJECT_ATTRIBUTE";
+const WALLET_PREFIX_PATTERN = /^(0x[a-fA-F0-9]{40})(-.+)?$/;
+
 const durationDaysMap: Record<ExpirationDuration, number> = {
   "1d": 1,
   "7d": 7,
@@ -104,6 +107,26 @@ const coerceDurationFromBlocks = (
   return closest.duration;
 };
 
+const getProjectAttributeValue = (entity: Entity) =>
+  entity.attributes
+    .find(
+      (attribute) =>
+        attribute.key === PROJECT_ATTRIBUTE_KEY || attribute.key.toLowerCase() === "project",
+    )
+    ?.value?.toString();
+
+const formatProjectAttributeLabel = (projectAttributeValue: string) => {
+  const trimmedValue = projectAttributeValue.trim();
+  const match = trimmedValue.match(WALLET_PREFIX_PATTERN);
+
+  if (!match) {
+    return trimmedValue;
+  }
+
+  const [, walletAddress, suffix = ""] = match;
+  return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}${suffix}`;
+};
+
 const mapGenericAttributesToFields = (entity: Entity) =>
   entity.attributes
     .filter((attribute) => attribute.key !== "type")
@@ -165,12 +188,18 @@ const getEntityLabel = (
     return nameAttribute.value.trim();
   }
 
+  const projectAttributeValue = getProjectAttributeValue(entity);
+  if (projectAttributeValue?.trim()) {
+    return formatProjectAttributeLabel(projectAttributeValue);
+  }
+
   // 5. Fallback to entity key
   return `${entity.key.slice(0, 10)}...${entity.key.slice(-6)}`;
 };
 
 export const mapEntityToSummary = (entity: Entity): OwnedArkivEntitySummary => {
   const payload = parsePayload(entity);
+  const projectAttributeValue = getProjectAttributeValue(entity);
   const compatible =
     payloadLooksLikeDesignerPayload(payload) || entity.attributes.length > 0 || Boolean(payload);
 
@@ -188,6 +217,7 @@ export const mapEntityToSummary = (entity: Entity): OwnedArkivEntitySummary => {
   return {
     key: entity.key,
     label: getEntityLabel(entity, payload),
+    projectAttributeValue,
     preview:
       entity.attributes.length > 0
         ? `${entity.attributes.length} indexed attribute${
@@ -234,11 +264,13 @@ export const mapEntityToSnapshot = (
       value: formatBlockNumber(entity.createdAtBlock) ?? "Unavailable",
     },
   ];
+  const projectAttributeValue = getProjectAttributeValue(entity);
 
   return {
     entityKey: entity.key,
-    label: getEntityLabel(entity, payload),
+    label: projectAttributeValue ? formatProjectAttributeLabel(projectAttributeValue) : "",
     fields,
+    projectAttributeValue,
     explorerUrl: getEntityExplorerUrl(entity.key),
     systemAttributes,
     confirmedExpirationBlock: formatBlockNumber(entity.expiresAtBlock),

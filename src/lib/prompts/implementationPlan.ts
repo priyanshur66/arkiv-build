@@ -41,7 +41,7 @@ Schema integrity — non-negotiable checks before returning the plan:
 - **Lifecycle wiring.** If you mention \`ExpirationTime\` or TTL, at least one entity must declare a concrete TTL strategy (which entity, how long, what triggers expiry). Don't dangle SDK helpers without binding them to a phase.
 
 Arkiv schema integrity — required in every plan (sourced from the official \`arkiv-best-practices\` skill):
-- **\`PROJECT_ATTRIBUTE\` is non-negotiable.** Define it once (e.g., \`{ key: "project", value: "<unique-string>" }\` exported from \`src/lib/arkiv/...\`). Every entity in the entity list MUST include it in its indexed attributes. Every query pattern MUST filter on it. If a query example is shown without it, the plan is wrong.
+- **\`PROJECT_ATTRIBUTE\` is non-negotiable.** Define it once (e.g., \`{ key: "PROJECT_ATTRIBUTE", value: "<unique-string>" }\` exported from \`src/lib/arkiv/...\`). Every entity in the entity list MUST include it in its indexed attributes. Every query pattern MUST filter on it. If a query example is shown without it, the plan is wrong.
 - **Trust = \`PROJECT_ATTRIBUTE\` + \`.createdBy(TRUSTED_WALLET)\`.** \`PROJECT_ATTRIBUTE\` alone does NOT prevent spam — any wallet can create entities tagged with your project. If the design has a backend/agent that publishes data the frontend reads, the plan MUST:
   1. Declare a \`CREATOR_WALLET_ADDRESS\` (or equivalent) constant for the trusted writer.
   2. Use \`.createdBy(CREATOR_WALLET_ADDRESS)\` in every read query for that data.

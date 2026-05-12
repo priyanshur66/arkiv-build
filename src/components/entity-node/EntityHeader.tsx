@@ -10,6 +10,7 @@ import {
   EXPIRATION_DURATION_OPTIONS,
   type ExpirationDuration,
 } from '@/lib/arkiv/types'
+import { useArkivStore } from '@/store/useArkivStore'
 import { useSchemaStore, type EntityNodeData } from '@/store/useSchemaStore'
 
 export function EntityHeader({
@@ -28,6 +29,7 @@ export function EntityHeader({
   const updateEntityName = useSchemaStore((s) => s.updateEntityName)
   const removeNode = useSchemaStore((s) => s.removeNode)
   const updateExpirationDuration = useSchemaStore((s) => s.updateExpirationDuration)
+  const account = useArkivStore((s) => s.account)
 
   return (
     <div className="p-7 pb-5">
@@ -38,11 +40,13 @@ export function EntityHeader({
           </div>
           <input
             value={data.label}
-            onChange={(e) => updateEntityName(nodeId, sanitizeIdentifier(e.target.value))}
+            onChange={(e) =>
+              updateEntityName(nodeId, sanitizeIdentifier(e.target.value), account)
+            }
             size={Math.max(data.label.length || 0, 12)}
             style={{ fieldSizing: 'content' } as CSSProperties}
             className="nodrag nopan h-10 min-w-0 border-transparent bg-transparent text-[22px] font-bold uppercase tracking-wider text-gray-900 outline-none placeholder:text-gray-300"
-            placeholder="ENTITY TYPE"
+            placeholder="PROJECT"
             disabled={!isDraft}
           />
         </div>

@@ -21,6 +21,8 @@ import type {
 } from "@/lib/arkiv/types";
 import { DESIGNER_APP_ID, DESIGNER_PAYLOAD_VERSION } from "@/lib/arkiv/types";
 
+const PROJECT_ATTRIBUTE_KEY = 'PROJECT_ATTRIBUTE'
+
 export const fetchBlockTiming = async (): Promise<BlockTimingState> => {
   const publicClient = createArkivPublicClient();
   return publicClient.getBlockTiming();
@@ -81,12 +83,61 @@ const buildDesignerPayload = (label: string, fields: EntityField[]): DesignerPay
   deployedAt: new Date().toISOString(),
 });
 
+const buildProjectAttributeValue = ({
+  account,
+  label,
+  projectAttributeValue,
+}: {
+  account: Hex;
+  label: string;
+  projectAttributeValue?: string;
+}) => {
+  const trimmedProjectAttributeValue = projectAttributeValue?.trim();
+
+  if (trimmedProjectAttributeValue) {
+    return trimmedProjectAttributeValue;
+  }
+
+  return `${account}-${label.trim()}`;
+};
+
+const buildIndexedAttributes = ({
+  fields,
+  account,
+  label,
+  projectAttributeValue,
+}: {
+  fields: EntityField[];
+  account: Hex;
+  label: string;
+  projectAttributeValue?: string;
+}) => {
+  const attributes = fields.map((field) => ({
+    key: field.name.trim(),
+    value: toAttributeValue(field),
+  }));
+
+  const projectAttribute = attributes.find(
+    (attribute) => attribute.key === PROJECT_ATTRIBUTE_KEY,
+  );
+
+  if (!projectAttribute) {
+    attributes.unshift({
+      key: PROJECT_ATTRIBUTE_KEY,
+      value: buildProjectAttributeValue({ account, label, projectAttributeValue }),
+    });
+  }
+
+  return attributes;
+};
+
 export const updatePersistedEntity = async ({
   account,
   entityKey,
   label,
   fields,
   entityData,
+  projectAttributeValue,
   currentBlock,
   expirationBlock,
 }: {
@@ -95,6 +146,7 @@ export const updatePersistedEntity = async ({
   label: string;
   fields: EntityField[];
   entityData?: string;
+  projectAttributeValue?: string;
   currentBlock: bigint;
   expirationBlock: bigint;
 }) => {
@@ -123,14 +175,11 @@ export const updatePersistedEntity = async ({
     payloadBytes = jsonToPayload(payload);
   }
 
-  const attributes = validFields.map((field) => ({
-    key: field.name.trim(),
-    value: toAttributeValue(field),
-  }));
-
-  attributes.push({
-    key: "type",
-    value: label.trim(),
+  const attributes = buildIndexedAttributes({
+    fields: validFields,
+    account,
+    label,
+    projectAttributeValue,
   });
 
   // RLP requires a canonical (non-zero, no leading-zero) uint64 for BTL.
@@ -169,17 +218,19 @@ export const deployEntityFromDraft = async ({
   fields,
   expirationDuration,
   dataFields,
+  projectAttributeValue,
 }: {
   account: Hex;
   label: string;
   fields: EntityField[];
   expirationDuration: ExpirationDuration;
   dataFields?: EntityDataField[];
+  projectAttributeValue?: string;
 }) => {
   const trimmedLabel = label.trim();
 
   if (!trimmedLabel) {
-    throw new Error("Entity name is required before deploying.");
+    throw new Error("Project name is required before deploying.");
   }
 
   const validFields = fields.filter(
@@ -210,14 +261,11 @@ export const deployEntityFromDraft = async ({
   }
 
   const expiresInSeconds = getExpirationSeconds(expirationDuration)
-  const attributes = validFields.map((field) => ({
-    key: field.name.trim(),
-    value: toAttributeValue(field),
-  }))
-
-  attributes.push({
-    key: "type",
-    value: trimmedLabel,
+  const attributes = buildIndexedAttributes({
+    fields: validFields,
+    account,
+    label: trimmedLabel,
+    projectAttributeValue,
   })
 
   const { entityKey, txHash } = await walletClient.createEntity({

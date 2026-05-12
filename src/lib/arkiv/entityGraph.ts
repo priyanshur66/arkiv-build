@@ -35,6 +35,7 @@ export const mapSnapshotToNodeData = (
 ): EntityNodeData => ({
   mode: 'persisted',
   label: snapshot.label,
+  projectAttributeValue: snapshot.projectAttributeValue,
   expirationDuration: snapshot.expirationDuration,
   fields: snapshot.fields,
   dataFields: [],

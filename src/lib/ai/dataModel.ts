@@ -40,6 +40,8 @@ const RELATION_COLORS = [
   '#84cc16',
 ] as const
 
+const PROJECT_ATTRIBUTE_KEY = 'PROJECT_ATTRIBUTE'
+
 const pickRelationColor = (index: number) =>
   RELATION_COLORS[index % RELATION_COLORS.length]
 
@@ -286,19 +288,34 @@ export const serializeCanvasToGeneratedDataModel = (
     })
     .filter((relation): relation is GeneratedRelation => relation !== null)
 
-  const entities = nodes.map((node, index) => ({
-    name: node.data.label.trim() || `Entity_${index + 1}`,
-    expirationDuration: node.data.expirationDuration,
-    indexedAttributes: node.data.fields.map((field) => ({
+  const entities = nodes.map((node, index) => {
+    const indexedAttributes = node.data.fields.map((field) => ({
       name: field.name,
       type: field.type,
       value:
         field.type === 'indexedNumber' && Number.isFinite(Number(field.value))
           ? Number(field.value)
           : field.value,
-    })),
-    dataFields: extractEntityDataFields(node),
-  }))
+    }))
+
+    if (
+      node.data.projectAttributeValue &&
+      !indexedAttributes.some((attribute) => attribute.name === PROJECT_ATTRIBUTE_KEY)
+    ) {
+      indexedAttributes.unshift({
+        name: PROJECT_ATTRIBUTE_KEY,
+        type: 'indexedString',
+        value: node.data.projectAttributeValue,
+      })
+    }
+
+    return {
+      name: node.data.label.trim() || `Entity_${index + 1}`,
+      expirationDuration: node.data.expirationDuration,
+      indexedAttributes,
+      dataFields: extractEntityDataFields(node),
+    }
+  })
 
   return {
     title: 'Current canvas model',
@@ -588,6 +605,11 @@ export const buildSchemaGraphFromGeneratedModel = (
           String(attribute.value ?? ''),
         ),
       )
+      const projectAttributeValue = entity.indexedAttributes.find(
+        (attribute) =>
+          attribute.name.trim() === PROJECT_ATTRIBUTE_KEY ||
+          attribute.name.trim().toLowerCase() === 'project',
+      )?.value
       const dataFields = entity.dataFields.map((field) =>
         createDataField(
           sanitizeIdentifier(field.key) || 'data',
@@ -606,6 +628,8 @@ export const buildSchemaGraphFromGeneratedModel = (
         data: {
           mode: 'draft',
           label: entity.schemaName,
+          projectAttributeValue:
+            projectAttributeValue === undefined ? undefined : String(projectAttributeValue),
           expirationDuration: entity.expirationDuration,
           fields,
           dataFields,

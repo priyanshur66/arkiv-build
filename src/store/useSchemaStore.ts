@@ -37,6 +37,7 @@ import {
 export type EntityNodeData = {
   mode: EntityNodeMode;
   label: string;
+  projectAttributeValue?: string;
   expirationDuration: ExpirationDuration;
   fields: EntityField[];
   dataFields: EntityDataField[];
@@ -71,7 +72,11 @@ type SchemaState = {
     nodeId: string,
     snapshot: PersistedEntitySnapshot & { expirationDuration: ExpirationDuration },
   ) => void;
-  updateEntityName: (nodeId: string, name: string) => void;
+  updateEntityName: (nodeId: string, name: string, walletAddress?: string) => void;
+  setProjectAttributeForConnectedDrafts: (
+    nodeId: string,
+    projectAttributeValue: string,
+  ) => void;
   updateExpirationDuration: (
     nodeId: string,
     duration: ExpirationDuration,
@@ -96,6 +101,8 @@ type SchemaState = {
 };
 
 const ENTITY_HORIZONTAL_GAP = 96;
+const PROJECT_ATTRIBUTE_KEY = "PROJECT_ATTRIBUTE";
+const WALLET_PREFIX_PATTERN = /^(0x[a-fA-F0-9]{40})(-.+)?$/;
 
 const getNextEntityPosition = (nodes: SchemaNode[]): XYPosition => {
   if (nodes.length === 0) {
@@ -119,6 +126,68 @@ const createEmptyField = (): EntityField => ({
   type: "indexedString",
   value: "",
 });
+
+const formatProjectAttributeLabel = (projectAttributeValue: string) => {
+  const trimmedValue = projectAttributeValue.trim();
+  const match = trimmedValue.match(WALLET_PREFIX_PATTERN);
+
+  if (!match) {
+    return trimmedValue;
+  }
+
+  const [, walletAddress, suffix = ""] = match;
+  return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}${suffix}`;
+};
+
+const upsertProjectAttributeField = (
+  fields: EntityField[],
+  projectAttributeValue: string,
+): EntityField[] => {
+  const projectAttributeIndex = fields.findIndex(
+    (field) =>
+      field.name === PROJECT_ATTRIBUTE_KEY || field.name.toLowerCase() === "project",
+  );
+
+  if (projectAttributeIndex >= 0) {
+    return fields.map((field, index) =>
+      index === projectAttributeIndex
+        ? {
+            ...field,
+            name: PROJECT_ATTRIBUTE_KEY,
+            type: "indexedString" as const,
+            value: projectAttributeValue,
+          }
+        : field,
+    );
+  }
+
+  const emptyFieldIndex = fields.findIndex(
+    (field) => !field.edgeId && !field.name.trim() && !field.value.trim(),
+  );
+
+  if (emptyFieldIndex >= 0) {
+    return fields.map((field, index) =>
+      index === emptyFieldIndex
+        ? {
+            ...field,
+            name: PROJECT_ATTRIBUTE_KEY,
+            type: "indexedString" as const,
+            value: projectAttributeValue,
+          }
+        : field,
+    );
+  }
+
+  return [
+    {
+      id: `${SCHEMA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
+      name: PROJECT_ATTRIBUTE_KEY,
+      type: "indexedString" as const,
+      value: projectAttributeValue,
+    },
+    ...fields,
+  ];
+};
 
 const createEmptyDataField = (): EntityDataField => ({
   id: `${SCHEMA_DATA_FIELD_ID_PREFIX}${crypto.randomUUID()}`,
@@ -151,6 +220,76 @@ const markSelectedNode = (nodes: SchemaNode[], nodeId: string) =>
     ...node,
     selected: node.id === nodeId,
   }));
+
+const createProjectAttributeValue = (walletAddress: string | undefined, name: string) => {
+  const trimmedWalletAddress = walletAddress?.trim();
+  const trimmedName = name.trim();
+
+  if (!trimmedWalletAddress || !trimmedName) {
+    return undefined;
+  }
+
+  return `${trimmedWalletAddress}-${trimmedName}`;
+};
+
+const findConnectedNodeIds = (
+  nodeId: string,
+  edges: SchemaEdge[],
+) => {
+  const connectedNodeIds = new Set([nodeId]);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    edges.forEach((edge) => {
+      const sourceConnected = connectedNodeIds.has(edge.source);
+      const targetConnected = connectedNodeIds.has(edge.target);
+
+      if (sourceConnected && !targetConnected) {
+        connectedNodeIds.add(edge.target);
+        changed = true;
+      }
+
+      if (targetConnected && !sourceConnected) {
+        connectedNodeIds.add(edge.source);
+        changed = true;
+      }
+    });
+  }
+
+  return connectedNodeIds;
+};
+
+const applyProjectAttributeToConnectedNodes = (
+  nodes: SchemaNode[],
+  edges: SchemaEdge[],
+  nodeId: string,
+  projectAttributeValue: string | undefined,
+  syncLabel = false,
+) => {
+  if (!projectAttributeValue) {
+    return nodes;
+  }
+
+  const connectedNodeIds = findConnectedNodeIds(nodeId, edges);
+
+  return nodes.map((node) =>
+    connectedNodeIds.has(node.id) && node.data.mode === "draft"
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            label: syncLabel
+              ? formatProjectAttributeLabel(projectAttributeValue)
+              : node.data.label,
+            projectAttributeValue,
+            fields: upsertProjectAttributeField(node.data.fields, projectAttributeValue),
+          },
+        }
+      : node,
+  );
+};
 
 export const useSchemaStore = create<SchemaState>((set, get) => ({
   nodes: [{ ...createDraftEntityNode(SCHEMA_ENTITY_START_POSITION), selected: true }],
@@ -228,13 +367,22 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
         relationNodeId: sourceNode.id,
       };
 
-      const nodes = updateNodeById(state.nodes, targetNode.id, (node) => ({
+      const projectAttributeValue = sourceNode.data.projectAttributeValue;
+
+      const nodesWithRelation = updateNodeById(state.nodes, targetNode.id, (node) => ({
         ...node,
         data: {
           ...node.data,
           fields: [...node.data.fields, newField],
         },
       }));
+      const nodes = applyProjectAttributeToConnectedNodes(
+        nodesWithRelation,
+        edges,
+        targetNode.id,
+        projectAttributeValue,
+        true,
+      );
 
       return { edges, nodes };
     }),
@@ -334,15 +482,35 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
         activeNodeId: nodeId,
       };
     }),
-  updateEntityName: (nodeId, name) =>
-    set((state) => ({
-      nodes: updateNodeById(state.nodes, nodeId, (node) => ({
+  updateEntityName: (nodeId, name, walletAddress) =>
+    set((state) => {
+      const projectAttributeValue = createProjectAttributeValue(walletAddress, name);
+      const nodesWithName = updateNodeById(state.nodes, nodeId, (node) => ({
         ...node,
         data: {
           ...node.data,
           label: name,
+          projectAttributeValue: projectAttributeValue ?? node.data.projectAttributeValue,
         },
-      })),
+      }));
+
+      return {
+        nodes: applyProjectAttributeToConnectedNodes(
+          nodesWithName,
+          state.edges,
+          nodeId,
+          projectAttributeValue,
+        ),
+      };
+    }),
+  setProjectAttributeForConnectedDrafts: (nodeId, projectAttributeValue) =>
+    set((state) => ({
+      nodes: applyProjectAttributeToConnectedNodes(
+        state.nodes,
+        state.edges,
+        nodeId,
+        projectAttributeValue,
+      ),
     })),
   updateExpirationDuration: (nodeId, duration) =>
     set((state) => ({

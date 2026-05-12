@@ -39,7 +39,7 @@ export function EntityAttributesEditor({
           >
             <div>
               <p className="mb-2 text-[12px] font-mono font-bold uppercase tracking-widest text-gray-400">
-                Field Name
+                Key
               </p>
               <div className="relative">
                 {isRelation ? (
@@ -53,14 +53,14 @@ export function EntityAttributesEditor({
                     updateFieldName(nodeId, field.id, sanitizeIdentifier(e.target.value))
                   }
                   className={`${inputClassName} ${isRelation ? 'pl-11 text-[#ff7a45]' : ''}`}
-                  placeholder="e.g. name"
+                  placeholder="Key"
                 />
               </div>
             </div>
 
             <div>
               <p className="mb-2 text-[12px] font-mono font-bold uppercase tracking-widest text-gray-400">
-                Initial Value
+                Value
               </p>
               <input
                 value={field.value}

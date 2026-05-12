@@ -370,12 +370,18 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     set({ deploying: true, deployingNodeId: node.id, error: undefined });
 
     try {
+      const projectAttributeValue =
+        node.data.projectAttributeValue ?? `${account}-${node.data.label.trim()}`;
+
+      schemaStore.setProjectAttributeForConnectedDrafts(node.id, projectAttributeValue);
+
       const { snapshot } = await deployEntityFromDraft({
         account,
         label: node.data.label,
         fields: node.data.fields,
         expirationDuration: node.data.expirationDuration,
         dataFields: node.data.dataFields,
+        projectAttributeValue,
       });
 
       schemaStore.setDeployFailed(node.id, false);
@@ -449,6 +455,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
         label: activeNode.data.label,
         fields: activeNode.data.fields,
         entityData: activeNode.data.entityData,
+        projectAttributeValue: activeNode.data.projectAttributeValue,
         currentBlock,
         expirationBlock,
       });
