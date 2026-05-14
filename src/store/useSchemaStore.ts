@@ -274,7 +274,7 @@ const applyProjectAttributeToConnectedNodes = (
   projectAttributeValue: string | undefined,
   syncLabel = false,
 ) => {
-  if (!projectAttributeValue) {
+  if (projectAttributeValue === undefined) {
     return nodes;
   }
 
@@ -286,15 +286,21 @@ const applyProjectAttributeToConnectedNodes = (
           ...node,
           data: {
             ...node.data,
-            label: syncLabel
-              ? formatProjectAttributeLabel(projectAttributeValue)
-              : node.data.label,
+            label:
+              syncLabel && projectAttributeValue
+                ? formatProjectAttributeLabel(projectAttributeValue)
+                : node.data.label,
             projectAttributeValue,
             fields: upsertProjectAttributeField(node.data.fields, projectAttributeValue),
           },
         }
       : node,
   );
+};
+
+const isProjectAttributeField = (field: EntityField) => {
+  const name = field.name.trim();
+  return name === LEGACY_PROJECT_ATTRIBUTE_KEY || name.toLowerCase() === PROJECT_ATTRIBUTE_KEY;
 };
 
 export const useSchemaStore = create<SchemaState>((set, get) => ({
@@ -628,17 +634,35 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       })),
     })),
   updateFieldValue: (nodeId, fieldId, value) =>
-    set((state) => ({
-      nodes: updateNodeById(state.nodes, nodeId, (node) => ({
+    set((state) => {
+      const sourceNode = state.nodes.find((n) => n.id === nodeId);
+      const targetField = sourceNode?.data.fields.find((f) => f.id === fieldId);
+      const isProjectEdit = !!targetField && isProjectAttributeField(targetField);
+
+      const nodesWithValue = updateNodeById(state.nodes, nodeId, (node) => ({
         ...node,
         data: {
           ...node.data,
+          projectAttributeValue: isProjectEdit ? value : node.data.projectAttributeValue,
           fields: node.data.fields.map((field) =>
             field.id === fieldId ? { ...field, value } : field,
           ),
         },
-      })),
-    })),
+      }));
+
+      if (!isProjectEdit) {
+        return { nodes: nodesWithValue };
+      }
+
+      return {
+        nodes: applyProjectAttributeToConnectedNodes(
+          nodesWithValue,
+          state.edges,
+          nodeId,
+          value,
+        ),
+      };
+    }),
   updateFieldType: (nodeId, fieldId, type) =>
     set((state) => ({
       nodes: updateNodeById(state.nodes, nodeId, (node) => ({
