@@ -23,6 +23,7 @@ import {
 
 import { ArkivOwnedEntitiesPanel } from "@/components/ArkivOwnedEntitiesPanel";
 import { ArkivToolbar } from "@/components/ArkivToolbar";
+import { ProjectCollisionPrompt } from "@/components/ProjectCollisionPrompt";
 import { TopNav } from "@/components/TopNav";
 import { UseCasePromptPanel } from "@/components/UseCasePromptPanel";
 import { Button } from "@/components/ui/button";
@@ -150,6 +151,8 @@ function SchemaCanvas() {
       <TopNav />
 
       <div className="pointer-events-none absolute inset-0 z-10">
+        <ProjectCollisionPrompt />
+
         {isAiPanelOpen ? (
           <button
             type="button"

@@ -26,6 +26,7 @@ export function EntityActions({
   const deployDraft = useArkivStore((s) => s.deployDraft)
   const deploying = useArkivStore((s) => s.deploying)
   const deployingNodeId = useArkivStore((s) => s.deployingNodeId)
+  const checkingProjectCollision = useArkivStore((s) => s.checkingProjectCollision)
   const walletAvailable = useArkivStore((s) => s.walletAvailable)
   const account = useArkivStore((s) => s.account)
   const chainId = useArkivStore((s) => s.chainId)
@@ -46,11 +47,17 @@ export function EntityActions({
             !account ||
             !isArkivBragaChain(chainId) ||
             deploying ||
+            checkingProjectCollision ||
             hasPendingParent
           }
           className="nodrag nopan h-14 w-full rounded-[14px] bg-[#1a1a1a] shadow-lg shadow-black/10 text-white font-mono tracking-widest uppercase text-xs transition-all duration-300 hover:bg-[#333] hover:shadow-xl hover:shadow-black/20 hover:-translate-y-1 active:scale-[0.98] disabled:hover:translate-y-0 disabled:hover:scale-100"
         >
-          {deploying && deployingNodeId === nodeId ? (
+          {checkingProjectCollision ? (
+            <>
+              <Loader2 className="mr-3 size-4 animate-spin" />
+              Checking project…
+            </>
+          ) : deploying && deployingNodeId === nodeId ? (
             <>
               <Loader2 className="mr-3 size-4 animate-spin" />
               Deploying…

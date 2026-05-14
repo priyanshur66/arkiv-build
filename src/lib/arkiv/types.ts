@@ -33,6 +33,8 @@ export type OwnedArkivEntitySummary = {
   key: Hex;
   label: string;
   projectAttributeValue?: string;
+  creator?: Hex;
+  owner?: Hex;
   preview: string;
   explorerUrl: string;
   compatible: boolean;
@@ -40,6 +42,13 @@ export type OwnedArkivEntitySummary = {
   createdAtBlock?: string;
   unsupportedReason?: string;
   fields?: EntityField[];
+};
+
+export type ProjectCollisionPrompt = {
+  projectAttributeValue: string;
+  entities: OwnedArkivEntitySummary[];
+  sameCreator: boolean;
+  otherCreator?: string;
 };
 
 export type PersistedEntitySnapshot = {

@@ -1,25 +1,61 @@
 'use client'
 
 import { ChevronDown, Link, Minus, Plus } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { inputClassName, selectClassName } from '@/components/entity-node/styles'
 import { sanitizeIdentifier } from '@/lib/arkiv/schema'
 import type { EntityField, IndexedAttributeType } from '@/lib/arkiv/types'
+import { useArkivStore } from '@/store/useArkivStore'
 import { useSchemaStore } from '@/store/useSchemaStore'
+
+const PROJECT_ATTRIBUTE_KEY = 'project'
+const LEGACY_PROJECT_ATTRIBUTE_KEY = 'PROJECT_ATTRIBUTE'
+const PROJECT_COLLISION_CHECK_DEBOUNCE_MS = 650
 
 export function EntityAttributesEditor({
   nodeId,
   fields,
+  isDraft,
 }: {
   nodeId: string
   fields: EntityField[]
+  isDraft: boolean
 }) {
   const addField = useSchemaStore((s) => s.addField)
   const removeField = useSchemaStore((s) => s.removeField)
   const updateFieldName = useSchemaStore((s) => s.updateFieldName)
   const updateFieldValue = useSchemaStore((s) => s.updateFieldValue)
   const updateFieldType = useSchemaStore((s) => s.updateFieldType)
+  const checkProjectAttributeCollision = useArkivStore(
+    (s) => s.checkProjectAttributeCollision,
+  )
+  const projectAttributeValue = useMemo(
+    () =>
+      fields
+        .find((field) => {
+          const name = field.name.trim()
+          return (
+            name === LEGACY_PROJECT_ATTRIBUTE_KEY ||
+            name.toLowerCase() === PROJECT_ATTRIBUTE_KEY
+          )
+        })
+        ?.value.trim() ?? '',
+    [fields],
+  )
+
+  useEffect(() => {
+    if (!isDraft) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void checkProjectAttributeCollision(projectAttributeValue)
+    }, PROJECT_COLLISION_CHECK_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [checkProjectAttributeCollision, isDraft, projectAttributeValue])
 
   return (
     <div className="space-y-4">

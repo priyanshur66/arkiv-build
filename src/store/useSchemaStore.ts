@@ -98,6 +98,7 @@ type SchemaState = {
   setDeployFailed: (nodeId: string, failed: boolean) => void;
   removeNode: (nodeId: string) => void;
   loadGraphOfEntities: (nodes: SchemaNode[], edges: SchemaEdge[]) => void;
+  mergeGraphOfEntities: (nodes: SchemaNode[], edges: SchemaEdge[]) => void;
 };
 
 const ENTITY_HORIZONTAL_GAP = 96;
@@ -687,5 +688,53 @@ export const useSchemaStore = create<SchemaState>((set, get) => ({
       nodes,
       edges,
       activeNodeId: nodes.find((n) => n.selected)?.id ?? nodes[0]?.id,
+    }),
+  mergeGraphOfEntities: (nodes, edges) =>
+    set((state) => {
+      const existingNodeIds = new Set(state.nodes.map((node) => node.id));
+      const existingEdgeIds = new Set(state.edges.map((edge) => edge.id));
+      const nextNodes = nodes.filter((node) => !existingNodeIds.has(node.id));
+      const nextNodeIds = new Set(nextNodes.map((node) => node.id));
+
+      if (nextNodes.length === 0) {
+        return {
+          activeNodeId: state.activeNodeId,
+        };
+      }
+
+      const rightMostX =
+        state.nodes.length > 0
+          ? Math.max(
+              ...state.nodes.map(
+                (node) => node.position.x + (node.measured?.width ?? SCHEMA_ENTITY_NODE_WIDTH),
+              ),
+            )
+          : SCHEMA_ENTITY_START_POSITION.x;
+      const leftMostIncomingX = Math.min(...nextNodes.map((node) => node.position.x));
+      const xOffset = rightMostX + ENTITY_HORIZONTAL_GAP - leftMostIncomingX;
+      const selectedNode = nextNodes.find((node) => node.selected) ?? nextNodes[0];
+
+      return {
+        nodes: [
+          ...state.nodes.map((node) => ({ ...node, selected: false })),
+          ...nextNodes.map((node) => ({
+            ...node,
+            position: {
+              x: node.position.x + xOffset,
+              y: node.position.y,
+            },
+          })),
+        ],
+        edges: [
+          ...state.edges,
+          ...edges.filter(
+            (edge) =>
+              !existingEdgeIds.has(edge.id) &&
+              (existingNodeIds.has(edge.source) || nextNodeIds.has(edge.source)) &&
+              (existingNodeIds.has(edge.target) || nextNodeIds.has(edge.target)),
+          ),
+        ],
+        activeNodeId: selectedNode.id,
+      };
     }),
 }));

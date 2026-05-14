@@ -219,6 +219,8 @@ export const mapEntityToSummary = (entity: Entity): OwnedArkivEntitySummary => {
     key: entity.key,
     label: getEntityLabel(entity, payload),
     projectAttributeValue,
+    creator: entity.creator,
+    owner: entity.owner,
     preview:
       entity.attributes.length > 0
         ? `${entity.attributes.length} indexed attribute${

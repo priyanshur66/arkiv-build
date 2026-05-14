@@ -1,7 +1,7 @@
 "use client";
 
 import type { Hex } from "@arkiv-network/sdk";
-import { desc } from "@arkiv-network/sdk/query";
+import { desc, eq } from "@arkiv-network/sdk/query";
 import { ExpirationTime, jsonToPayload, stringToPayload } from "@arkiv-network/sdk/utils";
 
 import { createArkivPublicClient, createArkivWalletClient } from "@/lib/arkiv/client";
@@ -24,6 +24,8 @@ import { DESIGNER_APP_ID, DESIGNER_PAYLOAD_VERSION } from "@/lib/arkiv/types";
 const PROJECT_ATTRIBUTE_KEY = 'project'
 const LEGACY_PROJECT_ATTRIBUTE_KEY = 'PROJECT_ATTRIBUTE'
 
+const PROJECT_QUERY_LIMIT = 100
+
 export const fetchBlockTiming = async (): Promise<BlockTimingState> => {
   const publicClient = createArkivPublicClient();
   return publicClient.getBlockTiming();
@@ -45,6 +47,43 @@ export const fetchWalletOwnedEntities = async (
     .fetch();
 
   return result.entities.map(mapEntityToSummary);
+};
+
+export const fetchEntitiesByProjectAttribute = async (
+  projectAttributeValue: string,
+): Promise<OwnedArkivEntitySummary[]> => {
+  const trimmedValue = projectAttributeValue.trim();
+
+  if (!trimmedValue) {
+    return [];
+  }
+
+  const publicClient = createArkivPublicClient();
+  const queryByAttribute = async (attributeKey: string) => {
+    const result = await publicClient
+      .buildQuery()
+      .where(eq(attributeKey, trimmedValue))
+      .withAttributes(true)
+      .withMetadata(true)
+      .withPayload(true)
+      .orderBy(desc("createdAtBlock", "number"))
+      .limit(PROJECT_QUERY_LIMIT)
+      .fetch();
+
+    return result.entities.map(mapEntityToSummary);
+  };
+
+  const [currentMatches, legacyMatches] = await Promise.all([
+    queryByAttribute(PROJECT_ATTRIBUTE_KEY),
+    queryByAttribute(LEGACY_PROJECT_ATTRIBUTE_KEY),
+  ]);
+  const byKey = new Map<Hex, OwnedArkivEntitySummary>();
+
+  for (const entity of [...currentMatches, ...legacyMatches]) {
+    byKey.set(entity.key, entity);
+  }
+
+  return Array.from(byKey.values());
 };
 
 export const fetchEntityDetails = async (

@@ -10,12 +10,13 @@ import {
 } from "@/lib/arkiv/entityGraph";
 import {
   deployEntityFromDraft,
+  fetchEntitiesByProjectAttribute,
   fetchBlockTiming,
   fetchEntityDetails,
   fetchWalletOwnedEntities,
   updatePersistedEntity,
 } from "@/lib/arkiv/entities";
-import type { BlockTimingState, OwnedArkivEntitySummary } from "@/lib/arkiv/types";
+import type { BlockTimingState, OwnedArkivEntitySummary, ProjectCollisionPrompt } from "@/lib/arkiv/types";
 import { getErrorMessage } from "@/lib/errors";
 import {
   connectMetaMask,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/arkiv/wallet";
 import {
   useSchemaStore,
+  type SchemaNode,
 } from "@/store/useSchemaStore";
 
 type ArkivState = {
@@ -43,6 +45,9 @@ type ArkivState = {
   connecting: boolean;
   deploying: boolean;
   deployingNodeId?: string;
+  checkingProjectCollision: boolean;
+  projectCollisionPrompt?: ProjectCollisionPrompt;
+  ignoredProjectAttributeValues: string[];
   updating: boolean;
   error?: string;
   networkNudge?: string;
@@ -54,6 +59,13 @@ type ArkivState = {
   startBalanceSync: () => () => void;
   refreshOwnedEntities: () => Promise<void>;
   loadEntityIntoCanvas: (entityKey: Hex) => Promise<void>;
+  loadProjectEntitiesIntoCanvas: (
+    projectAttributeValue: string,
+    options?: { keepCurrentCanvas?: boolean },
+  ) => Promise<void>;
+  checkProjectAttributeCollision: (projectAttributeValue: string) => Promise<void>;
+  ignoreProjectCollisionPrompt: () => void;
+  dismissProjectCollisionPrompt: () => void;
   deployActiveDraft: () => Promise<void>;
   deployDraft: (nodeId: string) => Promise<void>;
   updateActiveEntity: () => Promise<void>;
@@ -63,8 +75,49 @@ type ArkivState = {
 let unsubscribeWalletEvents: (() => void) | undefined;
 let balanceRefreshPromise: Promise<void> | undefined;
 let balanceSyncStop: (() => void) | undefined;
+let projectCollisionRequestId = 0;
 
 const BALANCE_SYNC_INTERVAL_MS = 20_000;
+const PROJECT_ATTRIBUTE_KEY = 'project';
+const LEGACY_PROJECT_ATTRIBUTE_KEY = 'PROJECT_ATTRIBUTE';
+
+const normalizeAddress = (value?: string) => value?.trim().toLowerCase();
+const normalizeProjectAttributeValue = (value: string) => value.trim().toLowerCase();
+
+const getProjectAttributeValueForDraft = (node: SchemaNode) => {
+  const fieldValue = node.data.fields.find((field) => {
+    const name = field.name.trim();
+    return name === LEGACY_PROJECT_ATTRIBUTE_KEY || name.toLowerCase() === PROJECT_ATTRIBUTE_KEY;
+  })?.value.trim();
+
+  return fieldValue || node.data.projectAttributeValue?.trim() || node.data.label.trim();
+};
+
+const buildProjectCollisionPrompt = ({
+  account,
+  projectAttributeValue,
+  entities,
+}: {
+  account: Hex;
+  projectAttributeValue: string;
+  entities: OwnedArkivEntitySummary[];
+}): ProjectCollisionPrompt | undefined => {
+  if (entities.length === 0) {
+    return undefined;
+  }
+
+  const normalizedAccount = normalizeAddress(account);
+  const otherEntity = entities.find(
+    (entity) => normalizeAddress(entity.creator) !== normalizedAccount,
+  );
+
+  return {
+    projectAttributeValue,
+    entities,
+    sameCreator: otherEntity === undefined,
+    otherCreator: otherEntity?.creator,
+  };
+};
 
 export const useArkivStore = create<ArkivState>((set, get) => ({
   initialized: false,
@@ -76,6 +129,9 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
   connecting: false,
   deploying: false,
   deployingNodeId: undefined,
+  checkingProjectCollision: false,
+  projectCollisionPrompt: undefined,
+  ignoredProjectAttributeValues: [],
   updating: false,
   initialize: async () => {
     if (get().initialized) {
@@ -327,6 +383,115 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       set({ loadingSelectedEntity: false });
     }
   },
+  loadProjectEntitiesIntoCanvas: async (projectAttributeValue, options) => {
+    const { account } = get();
+
+    if (!account) {
+      set({
+        error: 'Connect MetaMask to Arkiv Braga before loading project entities.',
+      });
+      return;
+    }
+
+    set({ loadingSelectedEntity: true, error: undefined });
+
+    try {
+      const entities = (await fetchEntitiesByProjectAttribute(projectAttributeValue)).filter(
+        (entity) => normalizeAddress(entity.creator) === normalizeAddress(account),
+      );
+
+      if (entities.length === 0) {
+        throw new Error('No entities for this project were created by the connected wallet.');
+      }
+
+      const { blockTiming } = get();
+      const snapshots = await Promise.all(
+        entities.map((entity) => fetchEntityDetails(entity.key, blockTiming)),
+      );
+      const { nodes, edges } = buildCanvasGraphFromSnapshots({
+        snapshots,
+        selectedEntityKey: entities[0].key,
+      });
+
+      if (options?.keepCurrentCanvas) {
+        useSchemaStore.getState().mergeGraphOfEntities(nodes, edges);
+      } else {
+        useSchemaStore.getState().loadGraphOfEntities(nodes, edges);
+      }
+      set({ projectCollisionPrompt: undefined });
+      await get().refreshOwnedEntities();
+    } catch (error) {
+      set({
+        error: getErrorMessage(error, 'Failed to load project entities into the canvas.'),
+      });
+    } finally {
+      set({ loadingSelectedEntity: false });
+    }
+  },
+  checkProjectAttributeCollision: async (projectAttributeValue) => {
+    const { account, ignoredProjectAttributeValues } = get();
+    const trimmedValue = projectAttributeValue.trim();
+    const requestId = ++projectCollisionRequestId;
+
+    if (
+      !account ||
+      !trimmedValue ||
+      ignoredProjectAttributeValues.includes(normalizeProjectAttributeValue(trimmedValue))
+    ) {
+      set({
+        checkingProjectCollision: false,
+        projectCollisionPrompt: undefined,
+      });
+      return;
+    }
+
+    set({ checkingProjectCollision: true, error: undefined });
+
+    try {
+      const matchingEntities = await fetchEntitiesByProjectAttribute(trimmedValue);
+
+      if (requestId !== projectCollisionRequestId) {
+        return;
+      }
+
+      set({
+        projectCollisionPrompt: buildProjectCollisionPrompt({
+          account,
+          projectAttributeValue: trimmedValue,
+          entities: matchingEntities,
+        }),
+        checkingProjectCollision: false,
+      });
+    } catch {
+      if (requestId !== projectCollisionRequestId) {
+        return;
+      }
+
+      set({
+        projectCollisionPrompt: undefined,
+        checkingProjectCollision: false,
+        error: 'Could not verify whether this project name is already in use.',
+      });
+    }
+  },
+  ignoreProjectCollisionPrompt: () => {
+    const prompt = get().projectCollisionPrompt;
+
+    if (!prompt) {
+      return;
+    }
+
+    const normalizedValue = normalizeProjectAttributeValue(prompt.projectAttributeValue);
+
+    set((state) => ({
+      ignoredProjectAttributeValues: state.ignoredProjectAttributeValues.includes(normalizedValue)
+        ? state.ignoredProjectAttributeValues
+        : [...state.ignoredProjectAttributeValues, normalizedValue],
+      projectCollisionPrompt: undefined,
+      checkingProjectCollision: false,
+    }));
+  },
+  dismissProjectCollisionPrompt: () => set({ projectCollisionPrompt: undefined }),
   deployActiveDraft: async () => {
     const { account } = get();
     const schemaStore = useSchemaStore.getState();
@@ -349,7 +514,7 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     await get().deployDraft(activeNode.id);
   },
   deployDraft: async (nodeId: string) => {
-    const { account } = get();
+    const { account, ignoredProjectAttributeValues } = get();
     const schemaStore = useSchemaStore.getState();
     const node = schemaStore.nodes.find((n) => n.id === nodeId);
 
@@ -367,11 +532,49 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
       return;
     }
 
-    set({ deploying: true, deployingNodeId: node.id, error: undefined });
+    set({
+      checkingProjectCollision: true,
+      projectCollisionPrompt: undefined,
+      error: undefined,
+    });
+
+    let collisionCheckComplete = false;
 
     try {
-      const projectAttributeValue =
-        node.data.projectAttributeValue ?? node.data.label.trim();
+      const projectAttributeValue = getProjectAttributeValueForDraft(node);
+
+      if (!projectAttributeValue) {
+        throw new Error('Project name is required before deploying.');
+      }
+
+      const isIgnoredProject = ignoredProjectAttributeValues.includes(
+        normalizeProjectAttributeValue(projectAttributeValue),
+      );
+
+      if (!isIgnoredProject) {
+        const matchingEntities = await fetchEntitiesByProjectAttribute(projectAttributeValue);
+        collisionCheckComplete = true;
+        const collisionPrompt = buildProjectCollisionPrompt({
+          account,
+          projectAttributeValue,
+          entities: matchingEntities,
+        });
+
+        if (collisionPrompt) {
+          schemaStore.setProjectAttributeForConnectedDrafts(node.id, projectAttributeValue);
+          set({
+            projectCollisionPrompt: collisionPrompt,
+            checkingProjectCollision: false,
+          });
+          return;
+        }
+      }
+
+      set({
+        checkingProjectCollision: false,
+        deploying: true,
+        deployingNodeId: node.id,
+      });
 
       schemaStore.setProjectAttributeForConnectedDrafts(node.id, projectAttributeValue);
 
@@ -392,10 +595,12 @@ export const useArkivStore = create<ArkivState>((set, get) => ({
     } catch (error) {
       schemaStore.setDeployFailed(node.id, true);
       set({
-        error: getErrorMessage(error, 'Arkiv deployment failed in MetaMask.'),
+        error: collisionCheckComplete
+          ? getErrorMessage(error, 'Arkiv deployment failed in MetaMask.')
+          : 'Could not verify whether this project name is already in use.',
       });
     } finally {
-      set({ deploying: false, deployingNodeId: undefined });
+      set({ checkingProjectCollision: false, deploying: false, deployingNodeId: undefined });
     }
   },
   updateActiveEntity: async () => {
