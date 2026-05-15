@@ -8,6 +8,12 @@ import { useArkivStore } from '@/store/useArkivStore'
 
 export function ArkivToolbar() {
   const addDraftEntity = useSchemaStore((state) => state.addDraftEntity)
+  const canvasProjectAttributeValue = useSchemaStore(
+    (state) => state.canvasProjectAttributeValue,
+  )
+  const setCanvasProjectAttributeValue = useSchemaStore(
+    (state) => state.setCanvasProjectAttributeValue,
+  )
   const error = useArkivStore((state) => state.error)
 
   return (
@@ -28,7 +34,23 @@ export function ArkivToolbar() {
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 space-y-3">
+          <div>
+            <label
+              htmlFor="canvas-project-attribute"
+              className="font-mono text-[11px] font-bold uppercase tracking-widest text-gray-400"
+            >
+              Project name
+            </label>
+            <input
+              id="canvas-project-attribute"
+              value={canvasProjectAttributeValue ?? ''}
+              onChange={(event) => setCanvasProjectAttributeValue(event.target.value)}
+              className="mt-2 h-10 w-full rounded-xl border border-gray-200 bg-gray-50/60 px-3 font-mono text-xs text-gray-900 outline-none transition focus:border-gray-300 focus:bg-white"
+              placeholder="project_slug_acme_7x9k"
+            />
+          </div>
+
           <Button
             onClick={addDraftEntity}
             className="h-10 rounded-xl bg-[#ff7a45] px-4 hover:bg-[#ff692a] font-semibold text-white transition-colors"

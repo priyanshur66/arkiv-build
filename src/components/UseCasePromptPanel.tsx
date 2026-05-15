@@ -675,6 +675,9 @@ export function UseCasePromptPanel({
             <p className="mt-1">
               Describe what users create, read, or update. Arkiv will ask only for the missing pieces before building the data model.
             </p>
+            <p className="mt-3 rounded-[14px] border border-[#ffe1cf] bg-[#fff8f4] px-3 py-2 text-xs leading-5 text-[#9a4b22]">
+              Beta notice: chat messages and undeployed model updates are not saved yet and may be lost. Keep your changes deployed if you want them to persist.
+            </p>
           </div>
         ) : null}
 
