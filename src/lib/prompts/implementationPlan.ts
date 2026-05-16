@@ -1,7 +1,10 @@
 import 'server-only'
 
 import type { GeneratedDataModel } from '@/lib/ai/dataModel'
-import type { AssistantMessage } from '@/lib/ai/assistantTypes'
+import type {
+  AssistantMessage,
+  ImplementationPlanExportTarget,
+} from '@/lib/ai/assistantTypes'
 
 //todo:23
 
@@ -9,6 +12,30 @@ const ARKIV_SKILL_LINKS = [
   '- [Arkiv best-practices skill](https://github.com/Arkiv-Network/skills/blob/main/skills/arkiv-best-practices/SKILL.md)',
   '- [Arkiv best-practices references](https://github.com/Arkiv-Network/skills/tree/main/skills/arkiv-best-practices/references)',
 ].join('\n')
+
+const IMPLEMENTATION_PLAN_TARGET_INSTRUCTIONS: Record<
+  ImplementationPlanExportTarget,
+  string
+> = {
+  nextjs: [
+    'Runtime target: full Next.js App Router application, including frontend UI and backend routes.',
+    'The implementation plan must cover user-facing pages, core UI flows, loading and empty states, and the main interactive components under `src/app/...` and `src/components/...`, not just API routes.',
+    'Prefer `src/app/...` pages, layouts, and route handlers, plus server-side modules under `src/lib/...`.',
+    'Use Next.js App Router conventions with explicit client/server component boundaries and `src/app/api/.../route.ts` when backend endpoints are needed.',
+    'For client-side state management, prefer the existing Zustand pattern with shared state under `src/store/...`.',
+    'For styling, prefer Tailwind CSS and describe a polished, modern UI with strong hierarchy, spacing, responsive behavior, and intentional empty/loading/error states rather than generic placeholder screens.',
+    'For implementation details that require general EVM interaction, prefer `ethers.js`. Keep Arkiv-specific reads/writes on the Arkiv SDK where required by the schema and data-access rules above.',
+    'Do not describe Express app bootstrap, `req`/`res` route registration, or a standalone Node server unless the user explicitly asks for both.',
+  ].join(' '),
+  express: [
+    'Runtime target: Express backend.',
+    'Prefer Express router/server setup, `app.get` / `app.post` style handlers, and Node backend module structure.',
+    'Use `req`/`res` handler conventions when giving route examples.',
+    'Treat this target as backend-focused; do not assume frontend pages or UI work unless the user explicitly asks for a separate frontend.',
+    'For implementation details that require general EVM interaction, prefer `ethers.js`. Keep Arkiv-specific reads/writes on the Arkiv SDK where required by the schema and data-access rules above.',
+    'Do not describe Next.js App Router route-handler files unless the user explicitly asks for both.',
+  ].join(' '),
+}
 
 export const buildImplementationPlanSystemPrompt = (skillContext: string) => `You are Arkiv Build Agent producing an AI-coding-agent-ready implementation plan for an Arkiv Build user.
 
@@ -84,14 +111,17 @@ export const buildImplementationPlanUserPrompt = ({
   useCase,
   currentModel,
   seedContext,
+  exportTarget,
 }: {
   messages: AssistantMessage[]
   useCase: string
   currentModel?: GeneratedDataModel
   seedContext?: unknown
+  exportTarget: ImplementationPlanExportTarget
 }) =>
   [
     'Create an implementation plan for this Arkiv app idea that an AI coding agent can execute directly.',
+    IMPLEMENTATION_PLAN_TARGET_INSTRUCTIONS[exportTarget],
     'Project attribute naming requirement for this run: define the project-scoping indexed attribute as "project" with a globally unique app/project slug value and no wallet address prefix.',
     `Latest user request or app idea:\n${useCase}`,
     messages.length > 0

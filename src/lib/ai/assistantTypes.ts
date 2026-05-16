@@ -2,6 +2,8 @@ import type { DataModelGenerationMode, GeneratedDataModel } from '@/lib/ai/dataM
 
 export type AssistantMessageRole = 'user' | 'assistant'
 
+export type ImplementationPlanExportTarget = 'nextjs' | 'express'
+
 export type ChoiceQuestion = {
   id: string
   prompt: string
@@ -70,4 +72,5 @@ export type AssistantApiRequest = {
   seedContext?: unknown
   schemaMode?: DataModelGenerationMode
   connectedWalletAddress?: string
+  exportTarget?: ImplementationPlanExportTarget
 }

@@ -1,6 +1,16 @@
 'use client'
 
-import { ArrowUp, Check, Clipboard, Loader2, Rocket, Sparkles, Trash2, Wand2, X } from 'lucide-react'
+import {
+  ArrowUp,
+  Check,
+  Clipboard,
+  Loader2,
+  Rocket,
+  Sparkles,
+  Trash2,
+  Wand2,
+  X,
+} from 'lucide-react'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -23,6 +33,7 @@ import type {
   AssistantMessage,
   AssistantSchemaResponse,
   AssistantSeedValuesResponse,
+  ImplementationPlanExportTarget,
 } from '@/lib/ai/assistantTypes'
 import { useArkivStore } from '@/store/useArkivStore'
 import { useSchemaStore } from '@/store/useSchemaStore'
@@ -35,6 +46,11 @@ type LoadingMode =
   | 'generateSchema'
   | 'generateSeedValues'
   | 'generateImplementationPlan'
+
+const EXPORT_TARGET_LABELS: Record<ImplementationPlanExportTarget, string> = {
+  nextjs: 'Next.js',
+  express: 'Express',
+}
 
 const loadingLabels: Record<LoadingMode, string> = {
   discussIdea: 'Understanding your app',
@@ -128,6 +144,9 @@ export function UseCasePromptPanel({
   const [generationTrace, setGenerationTrace] =
     useState<AssistantSchemaResponse['generationTrace']>()
   const [loadingMode, setLoadingMode] = useState<LoadingMode>()
+  const [isExportTargetChooserOpen, setIsExportTargetChooserOpen] = useState(false)
+  const [selectedExportTarget, setSelectedExportTarget] =
+    useState<ImplementationPlanExportTarget>('nextjs')
   const [error, setError] = useState<string>()
   const [selections, setSelections] = useState<Record<string, Record<string, string>>>({})
   const submittedSelectionsRef = useRef<Set<string>>(new Set())
@@ -198,6 +217,21 @@ export function UseCasePromptPanel({
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!isExportTargetChooserOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsExportTargetChooserOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isExportTargetChooserOpen])
 
   const runDiscussionTurn = async (userText: string) => {
     const trimmed = userText.trim()
@@ -324,7 +358,7 @@ export function UseCasePromptPanel({
     }
   }
 
-  const handleGeneratePlan = async () => {
+  const handleGeneratePlan = async (exportTarget: ImplementationPlanExportTarget) => {
     const useCase = getConversationUseCase(messages, input)
 
     if (!useCase) {
@@ -348,6 +382,7 @@ export function UseCasePromptPanel({
           currentModel: implementationPlanModel,
           seedContext,
           connectedWalletAddress,
+          exportTarget,
         }),
       })
 
@@ -359,12 +394,32 @@ export function UseCasePromptPanel({
 
       setPlan(payload.plan)
       setHasCopiedPlan(false)
+      setSelectedExportTarget(exportTarget)
     } catch (nextError) {
       console.error('[ai:assistant:client] plan generation failed', nextError)
       setError(getErrorMessage(nextError, MODEL_UNAVAILABLE_MESSAGE))
     } finally {
       setLoadingMode(undefined)
     }
+  }
+
+  const handleOpenExportTargetChooser = () => {
+    const useCase = getConversationUseCase(messages, input)
+
+    if (!useCase) {
+      setError('Describe the app idea before generating a plan.')
+      return
+    }
+
+    setError(undefined)
+    setIsExportTargetChooserOpen(true)
+  }
+
+  const handleChooseExportTarget = async (
+    exportTarget: ImplementationPlanExportTarget,
+  ) => {
+    setIsExportTargetChooserOpen(false)
+    await handleGeneratePlan(exportTarget)
   }
 
   const handleGenerateSeedValues = async () => {
@@ -602,7 +657,7 @@ export function UseCasePromptPanel({
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleGeneratePlan}
+            onClick={handleOpenExportTargetChooser}
             disabled={isLoading}
             className="flex h-8 items-center gap-1.5 rounded-[10px] border border-[#ffc4a6] bg-[#fff8f4] px-2.5 text-xs font-bold text-[#ff7a45] shadow-sm transition hover:bg-[#fff0e8] disabled:opacity-40"
           >
@@ -752,7 +807,12 @@ export function UseCasePromptPanel({
         {plan ? (
           <div className="mt-4 overflow-hidden rounded-[18px] border border-[#ffd4bf] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <div className="flex items-center justify-between border-b border-[#ffe0d1] px-3 py-2">
-              <p className="text-xs font-bold text-gray-800">Implementation prompt</p>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-gray-800">Implementation prompt</p>
+                <p className="text-[11px] text-gray-500">
+                  Target: {EXPORT_TARGET_LABELS[selectedExportTarget]}
+                </p>
+              </div>
               <Button
                 type="button"
                 variant="ghost"
@@ -817,6 +877,82 @@ export function UseCasePromptPanel({
           </Button>
         </div>
       </div>
+
+      {isExportTargetChooserOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="implementation-export-target-title"
+          className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center px-4 animate-in fade-in duration-200"
+        >
+          <button
+            type="button"
+            aria-label="Close export target chooser"
+            onClick={() => setIsExportTargetChooserOpen(false)}
+            className="absolute inset-0 cursor-default bg-gray-950/20 backdrop-blur-[2px]"
+          />
+
+          <div className="relative w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-[#ffd8c3] bg-white/95 p-6 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              aria-label="Close export target chooser"
+              onClick={() => setIsExportTargetChooserOpen(false)}
+              className="absolute right-4 top-4 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+            >
+              <X className="size-4" />
+            </button>
+
+            <div className="pr-8">
+              <p
+                id="implementation-export-target-title"
+                className="text-sm font-bold text-gray-950"
+              >
+                Choose export target
+              </p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                This shapes the generated implementation prompt for the backend
+                structure you want.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <Button
+                type="button"
+                onClick={() => void handleChooseExportTarget('nextjs')}
+                className="h-auto min-h-24 flex-col items-start rounded-[18px] bg-[#fff8f4] px-4 py-4 text-left text-[#ff7a45] shadow-sm hover:bg-[#fff0e8]"
+              >
+                <span className="text-sm font-bold">Next.js</span>
+                <span className="text-xs leading-5 text-[#9a4b22]">
+                  App Router API routes and server modules under `src/lib/...`
+                </span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleChooseExportTarget('express')}
+                className="h-auto min-h-24 flex-col items-start rounded-[18px] border-gray-200 bg-white px-4 py-4 text-left text-gray-800 shadow-sm hover:bg-gray-50"
+              >
+                <span className="text-sm font-bold">Express</span>
+                <span className="text-xs leading-5 text-gray-500">
+                  Express router setup with `req` / `res` handlers
+                </span>
+              </Button>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsExportTargetChooserOpen(false)}
+                className="rounded-[12px] px-3 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -9,6 +9,7 @@ import type {
   AssistantApiRequest,
   AssistantMessage,
   ChoiceQuestion,
+  ImplementationPlanExportTarget,
 } from '@/lib/ai/assistantTypes'
 import {
   MODELS_WITHOUT_STRUCTURED_OUTPUTS,
@@ -119,6 +120,16 @@ const normalizeConnectedWalletAddress = (value: unknown) => {
   }
 
   return trimmed.toLowerCase()
+}
+
+const normalizeImplementationPlanExportTarget = (
+  value: unknown,
+): ImplementationPlanExportTarget => {
+  if (value === 'express') {
+    return 'express'
+  }
+
+  return 'nextjs'
 }
 
 const getLatestUserText = ({
@@ -522,6 +533,7 @@ export async function POST(request: Request) {
   const connectedWalletAddress = normalizeConnectedWalletAddress(
     body.connectedWalletAddress,
   )
+  const exportTarget = normalizeImplementationPlanExportTarget(body.exportTarget)
 
   console.info('[ai:assistant] parsed request body', {
     requestId,
@@ -532,6 +544,7 @@ export async function POST(request: Request) {
     useCaseLength: useCase?.length ?? 0,
     hasCurrentModel: Boolean(body.currentModel),
     hasConnectedWalletAddress: Boolean(connectedWalletAddress),
+    exportTarget,
   })
 
   if (
@@ -622,6 +635,7 @@ export async function POST(request: Request) {
           useCase: requiredUseCase,
           currentModel: body.currentModel,
           seedContext: body.seedContext,
+          exportTarget,
         }),
         requestId,
         maxTokens: 8000,
