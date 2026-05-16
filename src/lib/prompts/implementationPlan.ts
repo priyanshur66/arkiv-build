@@ -19,6 +19,7 @@ const IMPLEMENTATION_PLAN_TARGET_INSTRUCTIONS: Record<
 > = {
   nextjs: [
     'Runtime target: full Next.js App Router application, including frontend UI and backend routes.',
+    'When the app is being created from an empty or non-Next.js workspace, start the plan with the standard scaffold command (`npx create-next-app@latest ...`) using TypeScript, App Router, `src/`, ESLint, and Tailwind options rather than asking the coding agent to manually create every framework bootstrap file. If the workspace already contains a Next.js app, explicitly say to reuse the existing app and skip re-scaffolding.',
     'The implementation plan must cover user-facing pages, core UI flows, loading and empty states, and the main interactive components under `src/app/...` and `src/components/...`, not just API routes.',
     'Prefer `src/app/...` pages, layouts, and route handlers, plus server-side modules under `src/lib/...`.',
     'Use Next.js App Router conventions with explicit client/server component boundaries and `src/app/api/.../route.ts` when backend endpoints are needed.',
@@ -29,6 +30,7 @@ const IMPLEMENTATION_PLAN_TARGET_INSTRUCTIONS: Record<
   ].join(' '),
   express: [
     'Runtime target: Express backend.',
+    'When the app is being created from an empty workspace, start the plan with standard package-manager setup commands (`npm init`, dependency installs, TypeScript/dev tooling as needed) rather than asking the coding agent to manually create every bootstrap file. If the workspace already contains an app, explicitly say to reuse the existing project and skip re-scaffolding.',
     'Prefer Express router/server setup, `app.get` / `app.post` style handlers, and Node backend module structure.',
     'Use `req`/`res` handler conventions when giving route examples.',
     'Treat this target as backend-focused; do not assume frontend pages or UI work unless the user explicitly asks for a separate frontend.',
@@ -100,6 +102,17 @@ Naming and SDK accuracy:
 File layout — match the existing project, do not invent a parallel tree:
 - This project follows \`AGENTS.md\`: shared utilities live under \`src/lib/\`. Existing Arkiv code is at \`src/lib/arkiv/{chain,client,entities,mappers,types}.ts\`.
 - New files in the plan MUST live under \`src/lib/arkiv/...\` (or \`src/components/...\`, \`src/store/...\` per AGENTS.md). Do NOT propose a parallel \`src/arkiv/...\` tree.
+
+Setup command discipline:
+- Plans MUST prefer official framework/package-manager commands for project bootstrap and dependency installation over hand-writing generated framework files. Examples: \`npx create-next-app@latest\` for a new Next.js app, \`npm install ...\` for dependencies, and generator/init commands for established tools.
+- Do NOT tell the coding agent to manually create files that a standard scaffold command should generate (\`package.json\`, \`tsconfig.json\`, base Next.js config, ESLint config, Tailwind/PostCSS wiring, default \`src/app\` shell) unless the user explicitly asked for a from-scratch manual setup.
+- If the target repo already exists and matches the runtime target, the plan should say to inspect and reuse the existing scaffold, then list only the files that need feature-level edits or additions.
+- Include bootstrap commands as an early "Project setup" or "Initial commands" section before the file-by-file implementation steps when the plan targets a new project.
+
+Git checkpoint discipline:
+- Plans MUST instruct the coding agent to make a git commit after each meaningful implementation step or phase, using concise commit messages that describe the completed work.
+- Each git checkpoint MUST be best-effort: if \`git status\`, \`git add\`, or \`git commit\` fails because git is unavailable, the directory is not a repository, user identity is missing, hooks fail, or the working tree has unrelated conflicts, the coding agent should skip that checkpoint, note the reason briefly, and continue generating/implementing without blocking on git.
+- Do NOT make git a hard prerequisite for implementation. The plan should still be executable in non-git workspaces.
 
 Reference this Arkiv skill context when relevant:
 ${skillContext}
