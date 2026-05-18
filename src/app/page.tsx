@@ -66,6 +66,10 @@ function SchemaCanvas() {
   const { setCenter, getNodes } = useReactFlow();
   const previousNodeIdsRef = useRef<Set<string>>(new Set());
   const nodeIdsKey = useMemo(() => nodes.map((node) => node.id).join('|'), [nodes]);
+  const visibleEdges = useMemo(
+    () => edges.filter((edge) => edge.source !== edge.target),
+    [edges],
+  )
   const isDevMode = process.env.NODE_ENV === 'development'
 
   const handleCopyCanvasModel = async () => {
@@ -275,7 +279,7 @@ function SchemaCanvas() {
       >
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={visibleEdges}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           onNodesChange={onNodesChange}
