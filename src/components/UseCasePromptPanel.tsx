@@ -476,6 +476,7 @@ export function UseCasePromptPanel({
           `Generated seed values for ${payload.dataModel?.entities.length ?? 0} draft entities. Foreign-key fields that depend on newly created entities stayed empty for single-transaction deployment.`,
         ),
       ])
+      onClose?.()
     } catch (nextError) {
       console.error('[ai:assistant:client] seed generation failed', nextError)
       setError(MODEL_UNAVAILABLE_MESSAGE)
@@ -502,6 +503,7 @@ export function UseCasePromptPanel({
           : 'Deployed the populated entities in one Arkiv transaction.',
       ),
     ])
+    onClose?.()
   }
 
   const handleSeedDeployAction = async () => {

@@ -26,7 +26,10 @@ For qualifying agent plans, the v1 backend strategy is fixed:
 For qualifying agent plans, required dependencies and setup:
 - Include \`deepagents\`, \`langchain\`, \`@langchain/core\`, and a search provider dependency.
 - Default the search provider to Tavily and include \`@langchain/tavily\` unless the user explicitly requested another provider.
-- Include provider environment variables for the selected LLM, search provider credentials, Arkiv RPC/chain config, \`CREATOR_WALLET_ADDRESS\`, the trusted writer private key or signer strategy, \`PROJECT_ATTRIBUTE\`, and deployed Arkiv schema/entity keys from the seed/deployment context.
+- Include provider environment variables for the selected LLM, search provider credentials, Arkiv RPC/chain config, \`AGENT_PRIVATE_KEY\`, and \`PROJECT_ATTRIBUTE\`.
+- Do NOT require \`ARKIV_WRITER_PRIVATE_KEY\`, \`CREATOR_WALLET_ADDRESS\`, \`ARKIV_WORKSPACE_KEY\`, \`ARKIV_PROFILE_KEY\`, or other deployed entity-key env vars for agent apps. Deployed keys from seed/deployment context are hints for smoke tests or defaults only; runtime must discover canonical entities from Arkiv queries.
+- Derive the trusted agent wallet address from \`AGENT_PRIVATE_KEY\` at startup with \`privateKeyToAccount\` (or the current SDK equivalent). Never ask the user to duplicate the same identity in a separate wallet-address env var.
+- Normalize \`AGENT_PRIVATE_KEY\` before creating the account: accept either 64 hex chars or \`0x\` + 64 hex chars, add \`0x\` when missing, reject non-hex or wrong-length values with a clear setup error such as "AGENT_PRIVATE_KEY must be a 32-byte hex private key".
 - Include LangSmith tracing environment variables or equivalent trace hooks when available; do not make tracing a hard runtime blocker.
 
 For qualifying agent plans, required Deep Agents wiring:
@@ -37,6 +40,7 @@ For qualifying agent plans, required Deep Agents wiring:
 - Provide a streaming chat path when the target framework supports it; otherwise provide a clear non-streaming fallback.
 
 For qualifying agent plans, required Arkiv-backed tools:
+- Use agent-neutral names and flows. The same rules apply to research agents, support agents, coding agents, sales agents, workflow agents, and any other app that persists agent memory or state.
 - \`save_memory\`: writes semantic long-term memory records to the deployed Arkiv memory schema with kind, scope, importance, recency/access metadata, provenance, and payload content.
 - \`search_memories\`: retrieves top memory candidates using \`PROJECT_ATTRIBUTE\`, \`entityType\`, trust filters, kind/scope filters, importance, lastAccessedAt/createdAt ordering, and pagination. If true vector search is needed, store embedding metadata or external vector references in Arkiv and explain the retrieval flow.
 - \`log_tool_call\`: appends tool execution records with task/conversation linkage, tool name, status, duration, input/output summary, error text when relevant, and provenance.
@@ -48,24 +52,36 @@ For qualifying agent plans, required Arkiv-backed tools:
 For qualifying agent plans, Arkiv data-access rules:
 - Treat the current visual schema and deployed seed context as authoritative. Use the deployed entity keys, transaction hashes, relation-update notes, \`PROJECT_ATTRIBUTE\`, and entity names from the provided context.
 - Every Arkiv read must filter by \`PROJECT_ATTRIBUTE\` and \`entityType\`.
-- Backend-authored agent memory must also filter by \`.createdBy(CREATOR_WALLET_ADDRESS)\`; use \`$creator\` as the immutable trust anchor.
-- Validate every \`entity.toJson()\` result with zod or valibot before using it in the agent.
+- Backend-authored agent memory must also filter by \`.createdBy(agentWalletAddress)\`, where \`agentWalletAddress\` is derived from \`AGENT_PRIVATE_KEY\`; use \`$creator\` as the immutable trust anchor.
+- Read queries that validate indexed schema fields MUST request/include attributes (for example with \`.withAttributes(true)\` when the SDK requires it).
+- Validate Arkiv reads by merging indexed attributes with \`entity.toJson()\` before zod/valibot parsing. Indexed attributes are part of the logical entity contract; \`entity.toJson()\` alone may omit required fields such as \`entityType\`, status, visibility, timestamps, FK keys, or scope keys.
+- Use a shared parser helper such as \`parseEntityWithSchema(entity, schema)\` that builds \`{ ...attributesToPayload(entity), ...entity.toJson() }\`, then validates the merged payload. Keep JSON payload values last so richer payload data wins when the same key exists in both places.
 - Use Arkiv SDK query helpers for filters/order/pagination and document the ranking rule for memory retrieval. Default ranking: exact scope/kind match first, then higher importance, then newer \`lastAccessedAt\` or \`createdAt\`.
 - Handle \`hasNextPage\` or equivalent pagination when listing memories, tool calls, source records, messages, or tasks.
 - Use \`mutateEntities\` for multi-record writes such as saving a memory plus provenance/tool-call/source records together.
 - Use \`ExpirationTime.fromDays/fromHours/fromMinutes\` helpers for new writes; do not use raw seconds in the generated implementation plan.
 
+For qualifying agent plans, required bootstrapping and resume flows:
+- On server startup or first authenticated request, derive the agent wallet from \`AGENT_PRIVATE_KEY\`, then discover the agent's profile by querying \`PROJECT_ATTRIBUTE\` + \`entityType = profile\` (or the schema's equivalent agent profile entity) + \`.createdBy(agentWalletAddress)\`.
+- If the agent profile does not exist, create it automatically with \`mutateEntities\` before handling chat or memory writes. Do not fail because a profile key env var is missing.
+- Discover workspaces by querying \`PROJECT_ATTRIBUTE\` + \`entityType = workspace\` (or the schema's equivalent workspace/scope entity) and the appropriate trust/ownership filter. Do not require \`ARKIV_WORKSPACE_KEY\` at runtime.
+- If no workspace exists, the UI must show an actionable empty state to create the first workspace. If multiple workspaces exist, provide a workspace selector plus an "add workspace" action. The selected workspace key should live in app state, URL params, local storage, or a user settings entity, not in mandatory deployment env.
+- Chat must be resumable: persist conversations/threads, messages, tool-call protocol state when applicable, task links, and workspace/profile scope keys. The UI must show recent conversations and allow opening an existing conversation to continue it instead of always starting a new one.
+- Resume must preserve agent runtime correctness. If using LangGraph/Deep Agents checkpoints, reconnect by thread/checkpoint id; if replaying from Arkiv, replay the native structured message/tool-call state, not a flattened display transcript.
+
 For qualifying agent plans, required failure handling:
-- Missing model/search/Arkiv/trusted-writer environment variables must fail with clear setup errors.
+- Missing model/search/Arkiv/\`AGENT_PRIVATE_KEY\` environment variables must fail with clear setup errors.
 - Search failure should return a useful agent-visible error and not write false source records.
-- Arkiv write failure should not fail the whole chat response when the agent can still answer; surface a memory/logging warning to the UI or response metadata.
-- Partial memory logging failure must be visible in logs/traces and must not corrupt task/conversation state.
-- Empty memory retrieval should produce an explicit "no relevant memories found" branch and continue with normal research.
+- Arkiv write failure should not fail the whole chat response when the agent can still answer; surface a stable memory/logging warning to the UI or response metadata, for example \`arkiv_logging_failed\`.
+- Private-key parsing failures must be distinct from Arkiv write failures and must report the exact env var plus accepted formats (64 hex chars or \`0x\` + 64 hex chars).
+- Partial memory logging failure must be visible in logs/traces and must not corrupt task/conversation state. The next request should still be able to resume from the last valid conversation/task state.
+- Empty memory retrieval should produce an explicit "no relevant memories found" branch and continue with the normal agent task.
 - Permission or trust-filter mismatch should produce a distinct error from "no data".
 
-For qualifying Next.js UI plans, require a usable research-agent interface:
+For qualifying Next.js UI plans, require a usable agent interface:
 - Chat surface with streaming/loading state, empty state, error state, and retry affordance.
-- Thread history or recent conversation list.
+- Thread history or recent conversation list with a resume action for each existing conversation.
+- Workspace onboarding and switching: empty-state create workspace, add workspace, and selected-workspace persistence.
 - Memory inspector showing durable Arkiv memories with kind, importance, scope, provenance, and source message/task links.
 - Task/working-memory panel showing active task, plan/context/decisions, and status changes.
 - Source/citation list showing retrieved URLs/documents/chunks and how they supported the answer.
@@ -160,16 +176,18 @@ Schema integrity — non-negotiable checks before returning the plan:
 Arkiv schema integrity — required in every plan (sourced from the official \`arkiv-best-practices\` skill):
 - **\`PROJECT_ATTRIBUTE\` is non-negotiable.** Define it once (e.g., \`{ key: "PROJECT_ATTRIBUTE", value: "<unique-app-slug>" }\` exported from \`src/lib/arkiv/...\`). Every entity in the entity list MUST include it in its indexed attributes. Every query pattern MUST filter on it. Its value must be a globally unique app/project slug and must not be prefixed with a wallet address. If a query example is shown without it, the plan is wrong.
 - **Trust = \`PROJECT_ATTRIBUTE\` + \`.createdBy(TRUSTED_WALLET)\`.** \`PROJECT_ATTRIBUTE\` alone does NOT prevent spam — any wallet can create entities tagged with your project. If the design has a backend/agent that publishes data the frontend reads, the plan MUST:
-  1. Declare a \`CREATOR_WALLET_ADDRESS\` (or equivalent) constant for the trusted writer.
-  2. Use \`.createdBy(CREATOR_WALLET_ADDRESS)\` in every read query for that data.
+  1. Derive a trusted wallet address from the signer/private key used for writes. For agent apps, the env var is \`AGENT_PRIVATE_KEY\`, and the derived constant should be named \`agentWalletAddress\` or equivalent.
+  2. Use \`.createdBy(agentWalletAddress)\` in every read query for that data.
   3. Use \`$creator\` (immutable) — NOT \`$owner\` (mutable) — for the trust filter.
+- **Private-key env discipline for agent apps.** Plans for agent-owned backends MUST use \`AGENT_PRIVATE_KEY\`, not \`ARKIV_WRITER_PRIVATE_KEY\`, and MUST normalize the key by accepting both \`0x\`-prefixed and unprefixed 32-byte hex. Do not require a separate creator wallet address env var when it can be derived from the private key.
+- **No mandatory deployed entity-key env vars.** Do not make \`ARKIV_WORKSPACE_KEY\`, \`ARKIV_PROFILE_KEY\`, or similar seed entity keys required runtime configuration. Query Arkiv for profile/workspace/scope entities by \`PROJECT_ATTRIBUTE\`, \`entityType\`, and trust/ownership filters; create missing agent profile records automatically and prompt the user in the UI to create/select a workspace when none exists.
 - **Owner vs creator must be modeled correctly.** If the plan needs to track "who currently controls this record" → \`$owner\` / \`.ownedBy()\`. If the plan needs "tamper-proof origin" → \`$creator\` / \`.createdBy()\`. Confusing the two breaks the trust model. Do not invent custom \`writerId\` / \`ownerId\` indexed attributes when \`$owner\` / \`$creator\` already give you the answer.
 - **Attribute typing drives operators.**
   - Range/sort fields (timestamps, ranks, scores, counters) MUST be \`indexedNumber\`. Storing them as \`indexedString\` silently kills \`gt/lt/gte/lte\`.
   - String fields are for equality and glob match only.
   - Audit every indexed attribute in the plan against the queries that consume it.
 - **No array attributes.** Arkiv attributes are flat key/value — no list type. One-to-many and many-to-many MUST be modeled as separate relationship entities (e.g., a \`Membership\` entity linking a \`User\` and a \`Group\`), never as an array inside an attribute or payload field.
-- **\`entity.toJson()\` returns \`any\`.** Any plan that mentions \`toJson()\` MUST also include a schema-validation step (zod or valibot) at the boundary. Add a \`src/lib/arkiv/validation.ts\` (or equivalent) module to the file list when this applies.
+- **\`entity.toJson()\` returns \`any\` and is incomplete for indexed contracts.** Any plan that mentions \`toJson()\` MUST also include a schema-validation step (zod or valibot) at the boundary. The validator MUST merge \`entity.attributes\` into the JSON payload before parsing because required schema fields often live as indexed attributes rather than JSON. Add a \`src/lib/arkiv/validation.ts\` (or equivalent) module to the file list when this applies.
 - **TTL via \`ExpirationTime\` helpers only.** No raw second counts. Use \`ExpirationTime.fromMinutes/fromHours/fromDays\` from \`@arkiv-network/sdk/utils\`. Right-size: short by default, extend via \`extendEntity\` if needed.
 - **Two clients, distinct roles.** Public read client (no key, frontend-safe) for queries. Wallet write client (signer-bound, backend or injected wallet) for creates/updates/deletes. The plan must say which client each module uses.
 - **Batch writes use \`mutateEntities\`.** Never propose sequential creates in a loop. Bootstrap flows, multi-record promotions, and any "create N records together" pattern must use \`mutateEntities\`.
