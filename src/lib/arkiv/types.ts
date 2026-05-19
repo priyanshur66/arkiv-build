@@ -48,7 +48,12 @@ export type ProjectCollisionPrompt = {
   projectAttributeValue: string;
   entities: OwnedArkivEntitySummary[];
   sameCreator: boolean;
+  hasConnectedWalletEntity: boolean;
+  hasOtherWalletEntity: boolean;
+  connectedWalletEntityCount: number;
+  otherWalletEntityCount: number;
   otherCreator?: string;
+  otherOwner?: string;
 };
 
 export type PersistedEntitySnapshot = {

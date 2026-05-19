@@ -108,15 +108,22 @@ const buildProjectCollisionPrompt = ({
   }
 
   const normalizedAccount = normalizeAddress(account);
-  const otherEntity = entities.find(
-    (entity) => normalizeAddress(entity.creator) !== normalizedAccount,
-  );
+  const isConnectedWalletEntity = (entity: OwnedArkivEntitySummary) =>
+    normalizeAddress(entity.owner ?? entity.creator) === normalizedAccount;
+  const connectedWalletEntities = entities.filter(isConnectedWalletEntity);
+  const otherWalletEntities = entities.filter((entity) => !isConnectedWalletEntity(entity));
+  const otherEntity = otherWalletEntities[0];
 
   return {
     projectAttributeValue,
     entities,
     sameCreator: otherEntity === undefined,
+    hasConnectedWalletEntity: connectedWalletEntities.length > 0,
+    hasOtherWalletEntity: otherEntity !== undefined,
+    connectedWalletEntityCount: connectedWalletEntities.length,
+    otherWalletEntityCount: otherWalletEntities.length,
     otherCreator: otherEntity?.creator,
+    otherOwner: otherEntity?.owner,
   };
 };
 

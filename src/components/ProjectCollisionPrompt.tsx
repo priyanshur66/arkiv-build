@@ -42,7 +42,9 @@ export function ProjectCollisionPrompt() {
     return null
   }
 
-  const entityNoun = prompt.entities.length === 1 ? 'entity' : 'entities'
+  const connectedEntityNoun =
+    prompt.connectedWalletEntityCount === 1 ? 'entity' : 'entities'
+  const otherEntityNoun = prompt.otherWalletEntityCount === 1 ? 'entity' : 'entities'
   const suggestedProjectAttribute = createSuggestedProjectAttributeValue(
     prompt.projectAttributeValue,
   )
@@ -59,7 +61,8 @@ export function ProjectCollisionPrompt() {
     setProjectAttributeForConnectedDrafts(activeDraftNodeId, projectAttributeValue)
     dismissProjectCollisionPrompt()
   }
-  const accent = prompt.sameCreator
+  const hasExistingWalletProject = prompt.hasConnectedWalletEntity
+  const accent = hasExistingWalletProject
     ? {
         ring: 'ring-orange-200/70',
         iconBg: 'bg-gradient-to-br from-orange-100 to-orange-200/60',
@@ -74,6 +77,9 @@ export function ProjectCollisionPrompt() {
         glow: 'shadow-rose-500/20',
         chip: 'bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-200',
       }
+  const title = hasExistingWalletProject
+    ? 'Existing project found'
+    : 'Project namespace already exists'
 
   return (
     <div
@@ -102,7 +108,7 @@ export function ProjectCollisionPrompt() {
           aria-hidden
           className={[
             'pointer-events-none absolute inset-x-0 top-0 h-px',
-            prompt.sameCreator
+            hasExistingWalletProject
               ? 'bg-gradient-to-r from-transparent via-orange-300/70 to-transparent'
               : 'bg-gradient-to-r from-transparent via-rose-300/70 to-transparent',
           ].join(' ')}
@@ -125,7 +131,7 @@ export function ProjectCollisionPrompt() {
               accent.iconColor,
             ].join(' ')}
           >
-            {prompt.sameCreator ? (
+            {hasExistingWalletProject ? (
               <Layers className="size-5" />
             ) : (
               <AlertTriangle className="size-5" />
@@ -137,7 +143,7 @@ export function ProjectCollisionPrompt() {
               id="project-collision-title"
               className="font-mono text-[11px] font-bold uppercase tracking-widest text-gray-500"
             >
-              Project name already exists
+              {title}
             </p>
 
             <div className="mt-2 flex items-center gap-2">
@@ -151,22 +157,28 @@ export function ProjectCollisionPrompt() {
               </span>
             </div>
 
-            {prompt.sameCreator ? (
+            {hasExistingWalletProject ? (
               <p className="mt-4 text-sm leading-6 text-gray-700">
-                You already have{' '}
+                Your wallet already has{' '}
                 <span className="font-semibold text-gray-950">
-                  {prompt.entities.length} {entityNoun}
+                  {prompt.connectedWalletEntityCount} {connectedEntityNoun}
                 </span>{' '}
-                with this project name. Load them into the canvas instead of
-                deploying duplicates.
+                in this project namespace. Load the existing project, or
+                continue adding this draft to the same project.
               </p>
             ) : (
               <p className="mt-4 text-sm leading-6 text-gray-700">
-                Another user is already using this project name from{' '}
+                This project namespace is already used by{' '}
+                <span className="font-semibold text-gray-950">
+                  {prompt.otherWalletEntityCount} {otherEntityNoun}
+                </span>{' '}
+                from{' '}
                 <span className="font-mono font-bold text-gray-950">
-                  {shortAddress(prompt.otherCreator)}
+                  {shortAddress(prompt.otherOwner ?? prompt.otherCreator)}
                 </span>
-                . Change the project value to avoid query collisions.
+                , but your connected wallet has no entities here yet. Choose a
+                unique namespace for a new project, or continue only if you
+                mean to join this existing one.
               </p>
             )}
           </div>
@@ -199,7 +211,7 @@ export function ProjectCollisionPrompt() {
               disabled={!activeDraftNodeId}
               className="h-10 rounded-xl bg-[#1a1a1a] px-4 font-mono text-xs font-bold uppercase tracking-widest text-white shadow-sm hover:bg-[#333] disabled:opacity-70"
             >
-              Update attribute
+              Change namespace
             </Button>
           </div>
         </form>
@@ -212,10 +224,10 @@ export function ProjectCollisionPrompt() {
             onClick={ignoreProjectCollisionPrompt}
             className="h-10 rounded-xl border-gray-200 bg-white px-4 font-mono text-xs font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:text-gray-900"
           >
-            Ignore
+            {hasExistingWalletProject ? 'Add to this project' : 'Use existing namespace'}
           </Button>
 
-          {prompt.sameCreator ? (
+          {hasExistingWalletProject ? (
             <>
               <Button
                 type="button"
@@ -228,7 +240,7 @@ export function ProjectCollisionPrompt() {
                 disabled={loadingSelectedEntity}
                 className="h-10 rounded-xl bg-[#ff7a45] px-4 font-mono text-xs font-bold uppercase tracking-widest text-white shadow-sm hover:bg-[#ff692a] disabled:opacity-70"
               >
-                {loadingSelectedEntity ? 'Loading...' : 'Keep and load entities'}
+                {loadingSelectedEntity ? 'Loading...' : 'Keep draft and load project'}
               </Button>
 
               <Button
@@ -238,10 +250,24 @@ export function ProjectCollisionPrompt() {
                 disabled={loadingSelectedEntity}
                 className="h-10 rounded-xl bg-[#1a1a1a] px-4 font-mono text-xs font-bold uppercase tracking-widest text-white shadow-sm hover:bg-[#333] disabled:opacity-70"
               >
-                {loadingSelectedEntity ? 'Loading...' : 'Load entities'}
+                {loadingSelectedEntity ? 'Loading...' : 'Load existing project'}
               </Button>
             </>
-          ) : null}
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                loadProjectEntitiesIntoCanvas(prompt.projectAttributeValue, {
+                  keepCurrentCanvas: true,
+                })
+              }
+              disabled={loadingSelectedEntity}
+              className="h-10 rounded-xl bg-rose-600 px-4 font-mono text-xs font-bold uppercase tracking-widest text-white shadow-sm hover:bg-rose-700 disabled:opacity-70"
+            >
+              {loadingSelectedEntity ? 'Loading...' : 'View matching entities'}
+            </Button>
+          )}
         </div>
       </div>
     </div>
